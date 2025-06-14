@@ -46,6 +46,7 @@
     "@elizaos/plugin-discord": "github:elizaos-plugins/plugin-discord#v1.0.10",
     "@elizaos/plugin-knowledge": "1.0.4",
     "@elizaos/plugin-telegram": "github:elizaos-plugins/plugin-telegram#v1.0.2",
+    "axios": "^1.7.7",
     "playwright": "^1.48.0",
     "ws": "^8.18.0",
     "zod": "3.24.2"
@@ -105,6 +106,21 @@
       "BROWSER_HEADLESS": {
         "type": "boolean",
         "description": "Run browser in headless mode (default: true)",
+        "required": false
+      },
+      "CAPSOLVER_API_KEY": {
+        "type": "string",
+        "description": "CapSolver API key for automated captcha solving (optional)",
+        "required": false
+      },
+      "TRUTHSOCIAL_USERNAME": {
+        "type": "string",
+        "description": "Truth Social username for login testing (optional)",
+        "required": false
+      },
+      "TRUTHSOCIAL_PASSWORD": {
+        "type": "string",
+        "description": "Truth Social password for login testing (optional)",
         "required": false
       }
     }

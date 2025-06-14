@@ -1,33 +1,30 @@
-import type { Plugin } from '@elizaos/core';
+import { Stagehand } from '@browserbasehq/stagehand';
+import type { Plugin, UUID } from '@elizaos/core';
 import {
   type Action,
   type Content,
-  type GenerateTextParams,
   type HandlerCallback,
   type IAgentRuntime,
+  logger,
   type Memory,
-  ModelType,
   type Provider,
   type ProviderResult,
   Service,
-  type State,
-  logger,
+  type State
 } from '@elizaos/core';
-import { Stagehand } from '@browserbasehq/stagehand';
 import { z } from 'zod';
+import { CapSolverService, detectCaptchaType, injectCaptchaSolution } from './capsolver';
 import {
-  BrowserServiceNotAvailableError,
-  handleBrowserError,
-  StagehandError,
-  BrowserTimeoutError,
-  BrowserNavigationError,
-  BrowserSessionError,
   BrowserActionError,
-  BrowserExtractionError,
+  BrowserNavigationError,
   BrowserSecurityError,
+  BrowserServiceNotAvailableError,
+  BrowserSessionError,
+  handleBrowserError,
+  StagehandError
 } from './errors';
-import { defaultUrlValidator, validateSecureAction, InputSanitizer } from './security';
-import { retryWithBackoff, browserRetryConfigs } from './retry';
+import { browserRetryConfigs, retryWithBackoff } from './retry';
+import { defaultUrlValidator, validateSecureAction } from './security';
 
 /**
  * Configuration schema for the browser automation plugin
@@ -42,6 +39,9 @@ const configSchema = z.object({
     .transform((val) => val === 'true')
     .optional()
     .default('true'),
+  CAPSOLVER_API_KEY: z.string().optional(),
+  TRUTHSOCIAL_USERNAME: z.string().optional(),
+  TRUTHSOCIAL_PASSWORD: z.string().optional(),
 });
 
 /**
@@ -77,9 +77,17 @@ export class StagehandService extends Service {
   private sessions: Map<string, BrowserSession> = new Map();
   private currentSessionId: string | null = null;
   private maxSessions = 3;
+  private capSolver: CapSolverService | null = null;
 
   constructor(protected runtime: IAgentRuntime) {
     super(runtime);
+    
+    // Initialize CapSolver if API key is available
+    const capSolverApiKey = process.env.CAPSOLVER_API_KEY;
+    if (capSolverApiKey) {
+      this.capSolver = new CapSolverService({ apiKey: capSolverApiKey });
+      logger.info('CapSolver service initialized');
+    }
   }
 
   static async start(runtime: IAgentRuntime) {
@@ -166,6 +174,74 @@ export class StagehandService extends Service {
       if (this.currentSessionId === sessionId) {
         this.currentSessionId = null;
       }
+    }
+  }
+
+  async handleCaptcha(session: BrowserSession): Promise<boolean> {
+    if (!this.capSolver) {
+      logger.warn('CapSolver not configured, cannot solve captcha');
+      return false;
+    }
+
+    try {
+      const page = session.page;
+      const url = page.url();
+      
+      // Detect captcha type
+      const captchaInfo = await detectCaptchaType(page);
+      
+      if (!captchaInfo.type || !captchaInfo.siteKey) {
+        logger.info('No captcha detected on page');
+        return false;
+      }
+
+      logger.info(`Detected ${captchaInfo.type} captcha with sitekey: ${captchaInfo.siteKey}`);
+
+      let solution: string;
+      
+      switch (captchaInfo.type) {
+        case 'turnstile':
+          solution = await this.capSolver.solveTurnstile(
+            url,
+            captchaInfo.siteKey
+          );
+          break;
+          
+        case 'recaptcha-v2':
+          solution = await this.capSolver.solveRecaptchaV2(
+            url,
+            captchaInfo.siteKey
+          );
+          break;
+          
+        case 'recaptcha-v3':
+          solution = await this.capSolver.solveRecaptchaV3(
+            url,
+            captchaInfo.siteKey,
+            'login'
+          );
+          break;
+          
+        case 'hcaptcha':
+          solution = await this.capSolver.solveHCaptcha(
+            url,
+            captchaInfo.siteKey
+          );
+          break;
+          
+        default:
+          logger.error('Unknown captcha type');
+          return false;
+      }
+
+      // Inject solution
+      await injectCaptchaSolution(page, captchaInfo.type, solution);
+      logger.info(`${captchaInfo.type} captcha solved and injected`);
+      
+      return true;
+    } catch (error) {
+      logger.error('Error handling captcha:', error);
+      return false;
     }
   }
 }
@@ -797,7 +873,7 @@ const browserSelectAction: Action = {
       {
         name: '{{agent}}',
         content: {
-          text: 'I\'ve selected "United States" from the country dropdown',
+          text: "I've selected 'United States' from the country dropdown",
           actions: ['BROWSER_SELECT'],
         },
       },
@@ -850,7 +926,7 @@ const browserExtractAction: Action = {
         schema: z.object({
           data: z.string().describe('The extracted data'),
           found: z.boolean().describe('Whether the requested data was found'),
-        }),
+        }) as any,
       });
 
       const responseContent: Content = {
@@ -975,6 +1051,82 @@ const browserScreenshotAction: Action = {
 };
 
 /**
+ * Browser solve captcha action
+ */
+const browserSolveCaptchaAction: Action = {
+  name: 'BROWSER_SOLVE_CAPTCHA',
+  similes: ['SOLVE_CAPTCHA', 'HANDLE_CAPTCHA', 'BYPASS_CAPTCHA'],
+  description: 'Detect and solve CAPTCHA on the current page',
+
+  validate: async (runtime: IAgentRuntime, _message: Memory, _state: State): Promise<boolean> => {
+    const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+    const session = await service?.getCurrentSession();
+    if (!session) return false;
+    
+    // Check if CapSolver is configured
+    return !!process.env.CAPSOLVER_API_KEY;
+  },
+
+  handler: async (
+    runtime: IAgentRuntime,
+    message: Memory,
+    _state: State,
+    _options: any,
+    callback: HandlerCallback,
+    _responses: Memory[]
+  ) => {
+    try {
+      logger.info('Handling BROWSER_SOLVE_CAPTCHA action');
+
+      const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+      const session = await service.getCurrentSession();
+
+      if (!session) {
+        throw new Error('No active browser session');
+      }
+
+      // Use the service's handleCaptcha method
+      const solved = await (service as any).handleCaptcha(session);
+
+      const responseContent: Content = {
+        text: solved 
+          ? 'I\'ve successfully solved the CAPTCHA on this page'
+          : 'No CAPTCHA was detected on this page',
+        actions: ['BROWSER_SOLVE_CAPTCHA'],
+        source: message.content.source,
+        data: { solved },
+      };
+
+      await callback(responseContent);
+      return responseContent;
+    } catch (error) {
+      logger.error('Error in BROWSER_SOLVE_CAPTCHA action:', error);
+      throw error;
+    }
+  },
+
+  /* v8 ignore start */
+  examples: [
+    [
+      {
+        name: '{{user}}',
+        content: {
+          text: 'Solve the captcha on this page',
+        },
+      },
+      {
+        name: '{{agent}}',
+        content: {
+          text: 'I\'ve successfully solved the CAPTCHA on this page',
+          actions: ['BROWSER_SOLVE_CAPTCHA'],
+        },
+      },
+    ],
+  ],
+  /* v8 ignore stop */
+};
+
+/**
  * Browser state provider
  */
 const browserStateProvider: Provider = {
@@ -1028,6 +1180,192 @@ const browserStateProvider: Provider = {
 /**
  * Stagehand browser automation plugin for ElizaOS
  */
+/**
+ * E2E Test Suite for Stagehand Plugin
+ */
+const stagehandE2ETestSuite = {
+  name: 'stagehand_plugin_e2e_tests',
+  description: 'E2E tests for the Stagehand browser automation plugin',
+  tests: [
+    {
+      name: 'should_navigate_to_url',
+      fn: async (runtime: IAgentRuntime) => {
+        const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+        if (!service) {
+          throw new Error('StagehandService not available');
+        }
+
+        // Create a session
+        const session = await service.createSession('test-navigation-session');
+        
+        // Navigate to a URL
+        await session.page.goto('https://example.com');
+        await session.page.waitForLoadState('domcontentloaded');
+        
+        // Verify we're on the right page
+        const url = session.page.url();
+        const title = await session.page.title();
+        
+        if (!url.includes('example.com')) {
+          throw new Error(`Expected URL to contain example.com, got ${url}`);
+        }
+        
+        if (!title) {
+          throw new Error('Expected page to have a title');
+        }
+
+        // Clean up
+        await service.destroySession('test-navigation-session');
+      },
+    },
+    {
+      name: 'should_detect_and_handle_captcha',
+      fn: async (runtime: IAgentRuntime) => {
+        const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+        if (!service) {
+          throw new Error('StagehandService not available');
+        }
+
+        const capSolverKey = runtime.getSetting('CAPSOLVER_API_KEY');
+        if (!capSolverKey) {
+          logger.warn('Skipping CAPTCHA test - CAPSOLVER_API_KEY not configured');
+          return;
+        }
+
+        // Create a session
+        const session = await service.createSession('test-captcha-session');
+        
+        // Navigate to a demo page with CAPTCHA
+        await session.page.goto('https://2captcha.com/demo/cloudflare-turnstile');
+        await session.page.waitForLoadState('networkidle');
+        
+        // Detect CAPTCHA
+        const captchaInfo = await detectCaptchaType(session.page);
+        
+        if (!captchaInfo.type) {
+          throw new Error('Expected to detect a CAPTCHA on the demo page');
+        }
+        
+        logger.info(`Detected ${captchaInfo.type} CAPTCHA`);
+
+        // Clean up
+        await service.destroySession('test-captcha-session');
+      },
+    },
+    {
+      name: 'truthsocial_login_flow',
+      fn: async (runtime: IAgentRuntime) => {
+        const username = runtime.getSetting('TRUTHSOCIAL_USERNAME');
+        const password = runtime.getSetting('TRUTHSOCIAL_PASSWORD');
+        const capSolverKey = runtime.getSetting('CAPSOLVER_API_KEY');
+        
+        if (!username || !password) {
+          logger.warn('Skipping Truth Social test - credentials not configured');
+          return;
+        }
+
+        const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+        if (!service) {
+          throw new Error('StagehandService not available');
+        }
+
+        const session = await service.createSession('test-truthsocial-session');
+        
+        try {
+          // Navigate to Truth Social login
+          await session.page.goto('https://truthsocial.com/login');
+          await session.page.waitForLoadState('networkidle');
+          
+          // Type username
+          await session.stagehand.act({
+            action: `type "${username}" into the username field`,
+          });
+          
+          // Type password
+          await session.stagehand.act({
+            action: `type "${password}" into the password field`,
+          });
+          
+          // Click login
+          await session.stagehand.act({
+            action: 'click on the login button',
+          });
+          
+          // Wait for potential CAPTCHA
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          
+          // Check for CAPTCHA and solve if present
+          if (capSolverKey) {
+            const handled = await (service as any).handleCaptcha(session);
+            if (handled) {
+              logger.info('CAPTCHA was solved successfully');
+            }
+          }
+          
+          // Wait for login to complete
+          await new Promise(resolve => setTimeout(resolve, 5000));
+          
+          // Try to extract user info to verify login
+          const userInfo = await session.stagehand.extract({
+            instruction: 'Extract the username or profile name',
+            schema: z.object({
+              username: z.string().optional(),
+              found: z.boolean(),
+            }) as any,
+          });
+          
+          if (userInfo.found && userInfo.username) {
+            logger.info(`Login successful! Found user: ${userInfo.username}`);
+          } else {
+            logger.warn('Could not verify login success');
+          }
+          
+        } finally {
+          // Clean up
+          await service.destroySession('test-truthsocial-session');
+        }
+      },
+    },
+    {
+      name: 'browser_actions_integration',
+      fn: async (runtime: IAgentRuntime) => {
+        const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+        if (!service) {
+          throw new Error('StagehandService not available');
+        }
+
+        // Test navigation action validation
+        const testMessage = {
+          id: 'test-msg-1' as UUID,
+          entityId: 'test-entity-1' as UUID,
+          content: { text: 'Navigate to https://elizaos.github.io/eliza/', source: 'test' },
+          userId: 'test-user' as UUID,
+          roomId: 'test-room' as UUID,
+          createdAt: Date.now(),
+        } as Memory;
+
+        // Validate the navigate action exists
+        const actions = [browserNavigateAction, browserBackAction, browserForwardAction, browserRefreshAction, browserClickAction, browserTypeAction, browserSelectAction, browserExtractAction, browserScreenshotAction, browserSolveCaptchaAction];
+        const navigateAction = actions.find(a => a.name === 'BROWSER_NAVIGATE');
+        
+        if (!navigateAction) {
+          throw new Error('Navigate action not found');
+        }
+
+        const canNavigate = await navigateAction.validate(runtime, testMessage, {} as State);
+        if (!canNavigate) {
+          throw new Error('Navigation action validation failed');
+        }
+
+        // Test state provider
+        const stateProvider = browserStateProvider;
+        const state = await stateProvider.get(runtime, testMessage, {} as State);
+        logger.info('Browser state:', state.text);
+      },
+    },
+  ],
+};
+
 export const stagehandPlugin: Plugin = {
   name: 'plugin-stagehand',
   description:
@@ -1038,6 +1376,9 @@ export const stagehandPlugin: Plugin = {
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     BROWSER_HEADLESS: process.env.BROWSER_HEADLESS,
+    CAPSOLVER_API_KEY: process.env.CAPSOLVER_API_KEY,
+    TRUTHSOCIAL_USERNAME: process.env.TRUTHSOCIAL_USERNAME,
+    TRUTHSOCIAL_PASSWORD: process.env.TRUTHSOCIAL_PASSWORD,
   },
   async init(config: Record<string, string>) {
     logger.info('Initializing Stagehand browser automation plugin');
@@ -1061,7 +1402,8 @@ export const stagehandPlugin: Plugin = {
     }
   },
   services: [StagehandService],
-  actions: [browserNavigateAction, browserBackAction, browserForwardAction, browserRefreshAction, browserClickAction, browserTypeAction, browserSelectAction, browserExtractAction, browserScreenshotAction],
+  tests: [stagehandE2ETestSuite],
+  actions: [browserNavigateAction, browserBackAction, browserForwardAction, browserRefreshAction, browserClickAction, browserTypeAction, browserSelectAction, browserExtractAction, browserScreenshotAction, browserSolveCaptchaAction],
   providers: [browserStateProvider],
   events: {
     BROWSER_PAGE_LOADED: [
@@ -1076,5 +1418,8 @@ export const stagehandPlugin: Plugin = {
     ],
   },
 };
+
+// Export CapSolver utilities for direct usage
+export { CapSolverService, detectCaptchaType, injectCaptchaSolution } from './capsolver';
 
 export default stagehandPlugin;
