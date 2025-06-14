@@ -12,20 +12,36 @@ vi.mock('@elizaos/core', () => ({
 }));
 
 describe('retry utilities', () => {
+  let unhandledRejections: any[] = [];
+  
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
+    unhandledRejections = [];
   });
 
-  afterEach(() => {
+  afterEach(async () => {
+    // Clean up any pending timers
+    await vi.runAllTimersAsync();
     vi.useRealTimers();
+    
+    // Clear any unhandled rejections
+    unhandledRejections = [];
   });
 
   // Suppress unhandled rejection warnings for expected failures
   const originalConsoleError = console.error;
+  const unhandledRejectionHandler = (reason: any) => {
+    unhandledRejections.push(reason);
+  };
+  
   beforeAll(() => {
+    process.on('unhandledRejection', unhandledRejectionHandler);
     console.error = (...args: any[]) => {
-      if (args[0]?.includes && args[0].includes('PromiseRejectionHandledWarning')) {
+      if (args[0]?.includes && (
+        args[0].includes('PromiseRejectionHandledWarning') ||
+        args[0].includes('test operation timed out')
+      )) {
         return;
       }
       originalConsoleError(...args);
@@ -33,6 +49,7 @@ describe('retry utilities', () => {
   });
 
   afterAll(() => {
+    process.off('unhandledRejection', unhandledRejectionHandler);
     console.error = originalConsoleError;
   });
 
@@ -83,12 +100,20 @@ describe('retry utilities', () => {
 
       // First attempt
       await vi.advanceTimersByTimeAsync(0);
+      expect(fn).toHaveBeenCalledTimes(1);
+      
       // Second attempt
       await vi.advanceTimersByTimeAsync(2000);
-
-      await expect(promise).rejects.toThrow('ETIMEDOUT');
       expect(fn).toHaveBeenCalledTimes(2);
+      
+      // Wait for the promise to settle
+      await expect(promise).rejects.toThrow('ETIMEDOUT');
+      
+      // Verify logging
       expect(logger.error).toHaveBeenCalledWith('test operation failed after 2 attempts');
+      
+      // Clean up any remaining timers
+      await vi.runAllTimersAsync();
     });
 
     it('should not retry non-retryable errors', async () => {
@@ -117,9 +142,14 @@ describe('retry utilities', () => {
         'test operation'
       );
 
+      // Advance timers and wait for the promise to reject
       await vi.advanceTimersByTimeAsync(1001);
-
+      
+      // Handle the rejection properly
       await expect(promise).rejects.toThrow('test operation timed out after 1000ms');
+      
+      // Ensure the timer callback doesn't execute after the test
+      await vi.runAllTimersAsync();
     });
 
     it('should apply exponential backoff', async () => {

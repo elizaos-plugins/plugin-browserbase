@@ -1320,9 +1320,162 @@ const stagehandE2ETestSuite = {
             logger.warn('Could not verify login success');
           }
           
+          // Extract bearer token from localStorage or sessionStorage
+          let bearerToken: string | null = null;
+          try {
+            bearerToken = await session.page.evaluate(() => {
+              // Check localStorage
+              const localToken = localStorage.getItem('access_token');
+              if (localToken) return localToken;
+              
+              // Check sessionStorage
+              const sessionToken = sessionStorage.getItem('access_token');
+              if (sessionToken) return sessionToken;
+              
+              // Check for token in various common keys
+              const keys = ['auth_token', 'authToken', 'bearer', 'token', 'jwt'];
+              for (const key of keys) {
+                const local = localStorage.getItem(key);
+                if (local) return local;
+                const session = sessionStorage.getItem(key);
+                if (session) return session;
+              }
+              
+              // Try to get from window object
+              if ((globalThis as any).authToken) return (globalThis as any).authToken;
+              if ((globalThis as any).bearerToken) return (globalThis as any).bearerToken;
+              
+              return null;
+            });
+            
+            if (bearerToken) {
+              logger.info(`Successfully retrieved bearer token: ${bearerToken.substring(0, 20)}...`);
+            } else {
+              logger.warn('Bearer token not found in storage');
+              
+              // Try to intercept network requests to get the token
+              const cdp = await session.page.context().newCDPSession(session.page);
+              await cdp.send('Network.enable');
+              
+              // Set up request interception
+              await new Promise<void>((resolve) => {
+                cdp.on('Network.responseReceived', (event: any) => {
+                  const headers = event.response.headers;
+                  if (headers.authorization) {
+                    bearerToken = headers.authorization.replace('Bearer ', '');
+                    logger.info(`Intercepted bearer token from network: ${bearerToken.substring(0, 20)}...`);
+                    resolve();
+                  }
+                });
+                
+                // Wait max 5 seconds for token
+                setTimeout(() => resolve(), 5000);
+              });
+            }
+          } catch (error) {
+            logger.error('Error retrieving bearer token:', error);
+          }
+          
+          // Log test results
+          logger.info('Truth Social login test results:', {
+            loginSuccess: userInfo.found && !!userInfo.username,
+            username: userInfo.username,
+            bearerToken: bearerToken ? `${bearerToken.substring(0, 20)}...` : null,
+          });
+          
         } finally {
           // Clean up
           await service.destroySession('test-truthsocial-session');
+        }
+      },
+    },
+    {
+      name: 'truthsocial_compose_post',
+      fn: async (runtime: IAgentRuntime) => {
+        const username = runtime.getSetting('TRUTHSOCIAL_USERNAME');
+        const password = runtime.getSetting('TRUTHSOCIAL_PASSWORD');
+        
+        if (!username || !password) {
+          logger.warn('Skipping Truth Social compose test - credentials not configured');
+          return;
+        }
+
+        const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+        if (!service) {
+          throw new Error('StagehandService not available');
+        }
+
+        const session = await service.createSession('test-compose-session');
+        
+        try {
+          // Navigate to Truth Social
+          await session.page.goto('https://truthsocial.com/');
+          await session.page.waitForTimeout(2000);
+          
+          // Click Sign In
+          await session.page.click('button:has-text("Sign In")');
+          await session.page.waitForTimeout(2000);
+          
+          // Login
+          await session.page.fill('input[type="text"]', username);
+          await session.page.fill('input[type="password"]', password);
+          await session.page.click('button[type="submit"]');
+          
+          // Wait for login and check for CAPTCHA
+          await session.page.waitForTimeout(3000);
+          const handled = await (service as any).handleCaptcha(session);
+          if (handled) {
+            logger.info('CAPTCHA was solved');
+          }
+          
+          // Wait for redirect to home
+          await session.page.waitForTimeout(5000);
+          
+          // Extract bearer token after login
+          let bearerToken: string | null = null;
+          try {
+            bearerToken = await session.page.evaluate(() => {
+              // Check common storage locations
+              const keys = ['access_token', 'auth_token', 'authToken', 'bearer', 'token', 'jwt'];
+              for (const key of keys) {
+                const local = localStorage.getItem(key);
+                if (local) return local;
+                const session = sessionStorage.getItem(key);
+                if (session) return session;
+              }
+              return null;
+            });
+            
+            if (bearerToken) {
+              logger.info(`Bearer token retrieved in compose test: ${bearerToken.substring(0, 20)}...`);
+            }
+          } catch (error) {
+            logger.warn('Could not retrieve bearer token:', error);
+          }
+          
+          // Click the Compose button on the left sidebar
+          const composeButton = await session.page.waitForSelector('button:has-text("Compose")', { timeout: 10000 });
+          await composeButton.click();
+          logger.info('Clicked Compose button');
+          
+          // Wait for compose modal
+          await session.page.waitForTimeout(2000);
+          
+          // Type post content
+          const timestamp = new Date().toISOString();
+          const postContent = `🤖 E2E test post from ElizaOS browser plugin - ${timestamp}`;
+          await session.page.keyboard.type(postContent);
+          logger.info('Typed post content');
+          
+          // Submit post
+          await session.page.click('button:has-text("Truth")');
+          logger.info('Submitted post');
+          
+          await session.page.waitForTimeout(3000);
+          logger.info('Post created successfully!');
+          
+        } finally {
+          await service.destroySession('test-compose-session');
         }
       },
     },

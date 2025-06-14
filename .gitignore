@@ -55,3 +55,10 @@ temp/
 .elizadb/
 pglite/
 cache/
+
+# Test artifacts
+*.png
+*.jpg
+*.jpeg
+downloads/
+IMPROVEMENTS.md
