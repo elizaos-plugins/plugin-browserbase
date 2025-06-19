@@ -1,5 +1,5 @@
 {
-  "name": "@elizaos/plugin-browserbase",
+  "name": "@elizaos/plugin-stagehand",
   "description": "Browser automation plugin for ElizaOS using Stagehand - enables AI agents to browse websites, interact with elements, and extract data",
   "version": "1.0.6",
   "type": "module",
@@ -42,7 +42,7 @@
   "dependencies": {
     "@browserbasehq/stagehand": "^1.7.0",
     "@elizaos/core": "^1.0.0",
-    "@elizaos/plugin-anthropic": "workspace:*",
+    "@elizaos/plugin-anthropic": "^1.0.0",
     "@elizaos/plugin-discord": "github:elizaos-plugins/plugin-discord#v1.0.10",
     "@elizaos/plugin-knowledge": "1.0.4",
     "@elizaos/plugin-telegram": "github:elizaos-plugins/plugin-telegram#v1.0.2",
@@ -72,7 +72,8 @@
     "test": "npm run test:component && npm run test:e2e",
     "publish": "elizaos publish",
     "format": "prettier --write ./src",
-    "format:check": "prettier --check ./src"
+    "format:check": "prettier --check ./src",
+    "generate-test-video": "node scripts/generate-test-video.js"
   },
   "publishConfig": {
     "access": "public"
@@ -121,6 +122,21 @@
       "TRUTHSOCIAL_PASSWORD": {
         "type": "string",
         "description": "Truth Social password for login testing (optional)",
+        "required": false
+      },
+      "TIKTOK_USERNAME": {
+        "type": "string",
+        "description": "TikTok username for login testing (optional)",
+        "required": false
+      },
+      "TIKTOK_PASSWORD": {
+        "type": "string",
+        "description": "TikTok password for login testing (optional)",
+        "required": false
+      },
+      "TIKTOK_TEST_VIDEO_PATH": {
+        "type": "string",
+        "description": "Path to test video file for TikTok upload testing (optional)",
         "required": false
       }
     }

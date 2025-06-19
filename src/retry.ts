@@ -36,7 +36,7 @@ const defaultRetryConfig: RetryConfig = {
  */
 function isRetryableError(error: Error, retryableErrors: string[]): boolean {
   const errorMessage = error.message.toLowerCase();
-  return retryableErrors.some(retryable => errorMessage.includes(retryable.toLowerCase()));
+  return retryableErrors.some((retryable) => errorMessage.includes(retryable.toLowerCase()));
 }
 
 /**
@@ -55,7 +55,7 @@ function calculateDelay(attempt: number, config: RetryConfig): number {
  * Sleep for specified milliseconds
  */
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -72,15 +72,17 @@ export async function retryWithBackoff<T>(
   for (let attempt = 1; attempt <= finalConfig.maxRetries; attempt++) {
     try {
       logger.info(`Attempting ${operationName} (attempt ${attempt}/${finalConfig.maxRetries})`);
-      
+
       // If timeout is specified, race against timeout
       if (finalConfig.timeout) {
         return await Promise.race([
           fn(),
-          new Promise<T>((_, reject) => 
-            setTimeout(() => reject(new Error(`${operationName} timed out after ${finalConfig.timeout}ms`)), 
-            finalConfig.timeout)
-          )
+          new Promise<T>((_, reject) =>
+            setTimeout(
+              () => reject(new Error(`${operationName} timed out after ${finalConfig.timeout}ms`)),
+              finalConfig.timeout
+            )
+          ),
         ]);
       } else {
         return await fn();
@@ -116,19 +118,11 @@ export async function retryWithBackoff<T>(
  * Retry decorator for class methods
  */
 export function Retry(config: Partial<RetryConfig> = {}) {
-  return function (
-    target: any,
-    propertyKey: string,
-    descriptor: PropertyDescriptor
-  ) {
+  return function (target: any, propertyKey: string, descriptor: PropertyDescriptor) {
     const originalMethod = descriptor.value;
 
     descriptor.value = async function (...args: any[]) {
-      return retryWithBackoff(
-        () => originalMethod.apply(this, args),
-        config,
-        propertyKey
-      );
+      return retryWithBackoff(() => originalMethod.apply(this, args), config, propertyKey);
     };
 
     return descriptor;
@@ -162,4 +156,4 @@ export const browserRetryConfigs = {
     backoffFactor: 1.5,
     timeout: 10000,
   } as RetryConfig,
-}; 
+};

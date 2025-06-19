@@ -96,7 +96,9 @@ function createRealRuntime() {
 describe('Plugin Configuration', () => {
   it('should have correct plugin metadata', () => {
     expect(stagehandPlugin.name).toBe('plugin-stagehand');
-    expect(stagehandPlugin.description).toBe('Browser automation plugin using Stagehand - stagehand is goated for web interactions');
+    expect(stagehandPlugin.description).toBe(
+      'Browser automation plugin using Stagehand - stagehand is goated for web interactions'
+    );
     expect(stagehandPlugin.config).toBeDefined();
   });
 
@@ -140,10 +142,13 @@ describe('Plugin Configuration', () => {
       // Test with completely invalid config
       try {
         // Pass a config that will cause parseAsync to fail
-        await stagehandPlugin.init({ 
-          BROWSER_HEADLESS: { invalid: 'object' } // This should fail string validation
-        } as any, runtime as any);
-        
+        await stagehandPlugin.init(
+          {
+            BROWSER_HEADLESS: { invalid: 'object' }, // This should fail string validation
+          } as any,
+          runtime as any
+        );
+
         // If we get here, the test should fail
         expect(true).toBe(false);
       } catch (error) {
@@ -153,15 +158,13 @@ describe('Plugin Configuration', () => {
       }
     }
   });
-
-
 });
 
 describe('Plugin Actions', () => {
   it('should have browser navigation actions', () => {
     expect(stagehandPlugin.actions).toBeDefined();
-    const actionNames = stagehandPlugin.actions?.map(a => a.name) || [];
-    
+    const actionNames = stagehandPlugin.actions?.map((a) => a.name) || [];
+
     expect(actionNames).toContain('BROWSER_NAVIGATE');
     expect(actionNames).toContain('BROWSER_BACK');
     expect(actionNames).toContain('BROWSER_FORWARD');
@@ -172,8 +175,8 @@ describe('Plugin Actions', () => {
 describe('Plugin Providers', () => {
   it('should have browser state provider', () => {
     expect(stagehandPlugin.providers).toBeDefined();
-    const providerNames = stagehandPlugin.providers?.map(p => p.name) || [];
-    
+    const providerNames = stagehandPlugin.providers?.map((p) => p.name) || [];
+
     expect(providerNames).toContain('BROWSER_STATE');
   });
 });
@@ -188,20 +191,20 @@ describe('Plugin Events', () => {
   it('should handle BROWSER_PAGE_LOADED event', async () => {
     const pageLoadedHandlers = stagehandPlugin.events?.BROWSER_PAGE_LOADED;
     expect(pageLoadedHandlers).toHaveLength(1);
-    
+
     if (pageLoadedHandlers) {
       // Call the handler with test data
       await pageLoadedHandlers[0]({
         url: 'https://test.com',
         title: 'Test Page',
-        sessionId: 'test-session-123'
+        sessionId: 'test-session-123',
       });
-      
+
       // Verify logger was called
       expect(logger.debug).toHaveBeenCalledWith('BROWSER_PAGE_LOADED event', {
         url: 'https://test.com',
         title: 'Test Page',
-        sessionId: 'test-session-123'
+        sessionId: 'test-session-123',
       });
     }
   });
@@ -209,18 +212,18 @@ describe('Plugin Events', () => {
   it('should handle BROWSER_ERROR event', async () => {
     const errorHandlers = stagehandPlugin.events?.BROWSER_ERROR;
     expect(errorHandlers).toHaveLength(1);
-    
+
     if (errorHandlers) {
       // Call the handler with test error
       await errorHandlers[0]({
         error: 'Test error message',
-        sessionId: 'test-session-456'
+        sessionId: 'test-session-456',
       });
-      
+
       // Verify logger was called
       expect(logger.error).toHaveBeenCalledWith('BROWSER_ERROR event', {
         error: 'Test error message',
-        sessionId: 'test-session-456'
+        sessionId: 'test-session-456',
       });
     }
   });
@@ -263,7 +266,9 @@ describe('StagehandService', () => {
     const originalGetService = runtime.getService;
     runtime.getService = () => null;
 
-    await expect(StagehandService.stop(runtime as any)).rejects.toThrow('Stagehand service not found');
+    await expect(StagehandService.stop(runtime as any)).rejects.toThrow(
+      'Stagehand service not found'
+    );
 
     // Restore original getService function
     runtime.getService = originalGetService;

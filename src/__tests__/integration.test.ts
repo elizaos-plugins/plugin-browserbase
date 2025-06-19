@@ -1,6 +1,12 @@
 import { describe, expect, it, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { stagehandPlugin, StagehandService, BrowserSession } from '../index';
-import { createMockRuntime, setupLoggerSpies, MockRuntime, createMockMemory, createMockState } from './test-utils';
+import {
+  createMockRuntime,
+  setupLoggerSpies,
+  MockRuntime,
+  createMockMemory,
+  createMockState,
+} from './test-utils';
 import { HandlerCallback, IAgentRuntime, Memory, State, UUID, logger } from '@elizaos/core';
 import { Stagehand } from '@browserbasehq/stagehand';
 
@@ -56,7 +62,7 @@ describe('Integration: Browser Navigation with StagehandService', () => {
     // Find the navigate action and state provider
     const navigateAction = stagehandPlugin.actions?.find((a) => a.name === 'BROWSER_NAVIGATE');
     const stateProvider = stagehandPlugin.providers?.find((p) => p.name === 'BROWSER_STATE');
-    
+
     expect(navigateAction).toBeDefined();
     expect(stateProvider).toBeDefined();
 
@@ -142,7 +148,7 @@ describe('Integration: Browser Navigation with StagehandService', () => {
 
     // Verify all actions were called correctly
     expect(mockCallback).toHaveBeenCalledTimes(3);
-    
+
     // Get the mock session to verify page methods were called
     const session = await service.getCurrentSession();
     expect(session).toBeDefined();
@@ -166,7 +172,7 @@ describe('Integration: Session Management', () => {
   it('should create session on first navigation and reuse it', async () => {
     const navigateAction = stagehandPlugin.actions?.find((a) => a.name === 'BROWSER_NAVIGATE');
     const refreshAction = stagehandPlugin.actions?.find((a) => a.name === 'BROWSER_REFRESH');
-    
+
     const mockCallback = vi.fn().mockResolvedValue([]);
 
     // First navigation - should create session
@@ -199,7 +205,7 @@ describe('Integration: Session Management', () => {
 
   it('should handle provider when no session exists', async () => {
     const stateProvider = stagehandPlugin.providers?.find((p) => p.name === 'BROWSER_STATE');
-    
+
     // Get state when no session exists
     const result = await stateProvider!.get(
       mockRuntime as unknown as IAgentRuntime,
@@ -221,9 +227,9 @@ describe('Integration: Plugin initialization and service registration', () => {
     // Initialize the plugin
     if (stagehandPlugin.init) {
       await stagehandPlugin.init(
-        { 
+        {
           BROWSERBASE_API_KEY: 'test-key',
-          BROWSER_HEADLESS: 'true'
+          BROWSER_HEADLESS: 'true',
         },
         mockRuntime as unknown as IAgentRuntime
       );
@@ -236,13 +242,11 @@ describe('Integration: Plugin initialization and service registration', () => {
     // Simulate service registration
     if (stagehandPlugin.services) {
       const ServiceClass = stagehandPlugin.services[0];
-      const serviceInstance = await ServiceClass.start(
-        mockRuntime as unknown as IAgentRuntime
-      );
+      const serviceInstance = await ServiceClass.start(mockRuntime as unknown as IAgentRuntime);
 
       // Register the Service class
       mockRuntime.registerService(ServiceClass);
-      
+
       // Verify the service was registered
       expect(registerServiceSpy).toHaveBeenCalledWith(expect.any(Function));
     }
@@ -265,7 +269,7 @@ describe('Integration: Error Handling', () => {
     const mockStagehand = new Stagehand({ env: 'LOCAL' } as any);
     const mockSession = new BrowserSession('error-session', mockStagehand as any);
     mockSession.page.goto = vi.fn().mockRejectedValue(new Error('Navigation failed'));
-    
+
     vi.spyOn(service, 'createSession').mockResolvedValue(mockSession);
 
     const navigateAction = stagehandPlugin.actions?.find((a) => a.name === 'BROWSER_NAVIGATE');
@@ -284,16 +288,19 @@ describe('Integration: Error Handling', () => {
     // Check that callback was called with error response
     expect(mockCallback).toHaveBeenCalledWith(
       expect.objectContaining({
-        text: expect.stringContaining('couldn\'t navigate to the requested page'),
+        text: expect.stringContaining("couldn't navigate to the requested page"),
         error: expect.objectContaining({
           code: 'BROWSER_NAVIGATION_ERROR',
           message: expect.stringContaining('Navigation failed'),
-          recoverable: true
-        })
+          recoverable: true,
+        }),
       })
     );
 
-    expect(logger.error).toHaveBeenCalledWith('Error in BROWSER_NAVIGATE action:', expect.any(Error));
+    expect(logger.error).toHaveBeenCalledWith(
+      'Error in BROWSER_NAVIGATE action:',
+      expect.any(Error)
+    );
   });
 
   it('should validate actions before execution', async () => {
@@ -301,7 +308,7 @@ describe('Integration: Error Handling', () => {
     mockRuntime.getService = vi.fn().mockReturnValue(null);
 
     const backAction = stagehandPlugin.actions?.find((a) => a.name === 'BROWSER_BACK');
-    
+
     // Validation should fail
     const isValid = await backAction!.validate(
       mockRuntime as unknown as IAgentRuntime,

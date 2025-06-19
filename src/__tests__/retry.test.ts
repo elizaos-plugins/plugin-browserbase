@@ -13,7 +13,7 @@ vi.mock('@elizaos/core', () => ({
 
 describe('retry utilities', () => {
   let unhandledRejections: any[] = [];
-  
+
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
@@ -24,7 +24,7 @@ describe('retry utilities', () => {
     // Clean up any pending timers
     await vi.runAllTimersAsync();
     vi.useRealTimers();
-    
+
     // Clear any unhandled rejections
     unhandledRejections = [];
   });
@@ -34,14 +34,15 @@ describe('retry utilities', () => {
   const unhandledRejectionHandler = (reason: any) => {
     unhandledRejections.push(reason);
   };
-  
+
   beforeAll(() => {
     process.on('unhandledRejection', unhandledRejectionHandler);
     console.error = (...args: any[]) => {
-      if (args[0]?.includes && (
-        args[0].includes('PromiseRejectionHandledWarning') ||
-        args[0].includes('test operation timed out')
-      )) {
+      if (
+        args[0]?.includes &&
+        (args[0].includes('PromiseRejectionHandledWarning') ||
+          args[0].includes('test operation timed out'))
+      ) {
         return;
       }
       originalConsoleError(...args);
@@ -65,15 +66,12 @@ describe('retry utilities', () => {
     });
 
     it('should retry on failure and succeed', async () => {
-      const fn = vi.fn()
+      const fn = vi
+        .fn()
         .mockRejectedValueOnce(new Error('net::ERR_CONNECTION_REFUSED'))
         .mockResolvedValueOnce('success');
 
-      const promise = retryWithBackoff(
-        fn,
-        { maxRetries: 3, initialDelay: 100 },
-        'test operation'
-      );
+      const promise = retryWithBackoff(fn, { maxRetries: 3, initialDelay: 100 }, 'test operation');
 
       // First attempt fails
       await vi.advanceTimersByTimeAsync(0);
@@ -92,26 +90,22 @@ describe('retry utilities', () => {
       const error = new Error('ETIMEDOUT');
       const fn = vi.fn().mockRejectedValue(error);
 
-      const promise = retryWithBackoff(
-        fn,
-        { maxRetries: 2, initialDelay: 100 },
-        'test operation'
-      );
+      const promise = retryWithBackoff(fn, { maxRetries: 2, initialDelay: 100 }, 'test operation');
 
       // First attempt
       await vi.advanceTimersByTimeAsync(0);
       expect(fn).toHaveBeenCalledTimes(1);
-      
+
       // Second attempt
       await vi.advanceTimersByTimeAsync(2000);
       expect(fn).toHaveBeenCalledTimes(2);
-      
+
       // Wait for the promise to settle
       await expect(promise).rejects.toThrow('ETIMEDOUT');
-      
+
       // Verify logging
       expect(logger.error).toHaveBeenCalledWith('test operation failed after 2 attempts');
-      
+
       // Clean up any remaining timers
       await vi.runAllTimersAsync();
     });
@@ -120,9 +114,9 @@ describe('retry utilities', () => {
       const error = new Error('Invalid credentials');
       const fn = vi.fn().mockRejectedValue(error);
 
-      await expect(
-        retryWithBackoff(fn, {}, 'test operation')
-      ).rejects.toThrow('Invalid credentials');
+      await expect(retryWithBackoff(fn, {}, 'test operation')).rejects.toThrow(
+        'Invalid credentials'
+      );
 
       expect(fn).toHaveBeenCalledTimes(1);
       expect(logger.error).toHaveBeenCalledWith(
@@ -132,28 +126,27 @@ describe('retry utilities', () => {
     });
 
     it('should handle timeout', async () => {
-      const fn = vi.fn().mockImplementation(() => 
-        new Promise(resolve => setTimeout(() => resolve('success'), 2000))
-      );
+      const fn = vi
+        .fn()
+        .mockImplementation(
+          () => new Promise((resolve) => setTimeout(() => resolve('success'), 2000))
+        );
 
-      const promise = retryWithBackoff(
-        fn,
-        { timeout: 1000 },
-        'test operation'
-      );
+      const promise = retryWithBackoff(fn, { timeout: 1000 }, 'test operation');
 
       // Advance timers and wait for the promise to reject
       await vi.advanceTimersByTimeAsync(1001);
-      
+
       // Handle the rejection properly
       await expect(promise).rejects.toThrow('test operation timed out after 1000ms');
-      
+
       // Ensure the timer callback doesn't execute after the test
       await vi.runAllTimersAsync();
     });
 
     it('should apply exponential backoff', async () => {
-      const fn = vi.fn()
+      const fn = vi
+        .fn()
         .mockRejectedValueOnce(new Error('Timeout'))
         .mockRejectedValueOnce(new Error('Timeout'))
         .mockResolvedValueOnce('success');
@@ -181,17 +174,18 @@ describe('retry utilities', () => {
     });
 
     it('should respect maxDelay', async () => {
-      const fn = vi.fn()
+      const fn = vi
+        .fn()
         .mockRejectedValueOnce(new Error('Timeout'))
         .mockResolvedValueOnce('success');
 
       const promise = retryWithBackoff(
         fn,
-        { 
-          maxRetries: 2, 
-          initialDelay: 5000, 
+        {
+          maxRetries: 2,
+          initialDelay: 5000,
           maxDelay: 3000,
-          backoffFactor: 2 
+          backoffFactor: 2,
         },
         'test'
       );
@@ -209,10 +203,11 @@ describe('retry utilities', () => {
 
   describe('Retry decorator', () => {
     it('should retry decorated method', async () => {
-      const originalFn = vi.fn()
+      const originalFn = vi
+        .fn()
         .mockRejectedValueOnce(new Error('Timeout'))
         .mockResolvedValueOnce('success');
-      
+
       const descriptor: PropertyDescriptor = {
         value: originalFn,
         writable: true,
@@ -227,12 +222,12 @@ describe('retry utilities', () => {
       );
 
       const promise = decoratedDescriptor.value();
-      
+
       await vi.advanceTimersByTimeAsync(0);
       await vi.advanceTimersByTimeAsync(2000);
-      
+
       const result = await promise;
-      
+
       expect(result).toBe('success');
       expect(originalFn).toHaveBeenCalledTimes(2);
     });
@@ -242,7 +237,7 @@ describe('retry utilities', () => {
         value: 'test',
         async getValue() {
           return this.value;
-        }
+        },
       };
 
       const descriptor: PropertyDescriptor = {
@@ -252,14 +247,10 @@ describe('retry utilities', () => {
         configurable: true,
       };
 
-      const decoratedDescriptor = Retry({ maxRetries: 1 })(
-        testObj,
-        'getValue',
-        descriptor
-      );
+      const decoratedDescriptor = Retry({ maxRetries: 1 })(testObj, 'getValue', descriptor);
 
       const result = await decoratedDescriptor.value.call(testObj);
-      
+
       expect(result).toBe('test');
     });
   });
@@ -267,7 +258,7 @@ describe('retry utilities', () => {
   describe('browserRetryConfigs', () => {
     it('should have navigation config', () => {
       const config = browserRetryConfigs.navigation;
-      
+
       expect(config.maxRetries).toBe(3);
       expect(config.initialDelay).toBe(2000);
       expect(config.maxDelay).toBe(10000);
@@ -277,7 +268,7 @@ describe('retry utilities', () => {
 
     it('should have action config', () => {
       const config = browserRetryConfigs.action;
-      
+
       expect(config.maxRetries).toBe(2);
       expect(config.initialDelay).toBe(1000);
       expect(config.maxDelay).toBe(5000);
@@ -287,7 +278,7 @@ describe('retry utilities', () => {
 
     it('should have extraction config', () => {
       const config = browserRetryConfigs.extraction;
-      
+
       expect(config.maxRetries).toBe(2);
       expect(config.initialDelay).toBe(500);
       expect(config.maxDelay).toBe(3000);
@@ -295,4 +286,4 @@ describe('retry utilities', () => {
       expect(config.timeout).toBe(10000);
     });
   });
-}); 
+});

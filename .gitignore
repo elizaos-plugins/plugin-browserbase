@@ -60,5 +60,12 @@ cache/
 *.png
 *.jpg
 *.jpeg
+*.mp4
+*.mov
+*.avi
 downloads/
+test-videos/
 IMPROVEMENTS.md
+.elizadb/
+.cursor/
+.elizadb-test/

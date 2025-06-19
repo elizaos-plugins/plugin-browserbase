@@ -10,7 +10,7 @@ import {
   type Provider,
   type ProviderResult,
   Service,
-  type State
+  type State,
 } from '@elizaos/core';
 import { z } from 'zod';
 import { CapSolverService, detectCaptchaType, injectCaptchaSolution } from './capsolver';
@@ -21,7 +21,7 @@ import {
   BrowserServiceNotAvailableError,
   BrowserSessionError,
   handleBrowserError,
-  StagehandError
+  StagehandError,
 } from './errors';
 import { browserRetryConfigs, retryWithBackoff } from './retry';
 import { defaultUrlValidator, validateSecureAction } from './security';
@@ -42,6 +42,9 @@ const configSchema = z.object({
   CAPSOLVER_API_KEY: z.string().optional(),
   TRUTHSOCIAL_USERNAME: z.string().optional(),
   TRUTHSOCIAL_PASSWORD: z.string().optional(),
+  TIKTOK_USERNAME: z.string().optional(),
+  TIKTOK_PASSWORD: z.string().optional(),
+  TIKTOK_TEST_VIDEO_PATH: z.string().optional(),
 });
 
 /**
@@ -81,7 +84,7 @@ export class StagehandService extends Service {
 
   constructor(protected runtime: IAgentRuntime) {
     super(runtime);
-    
+
     // Initialize CapSolver if API key is available
     const capSolverApiKey = process.env.CAPSOLVER_API_KEY;
     if (capSolverApiKey) {
@@ -186,10 +189,10 @@ export class StagehandService extends Service {
     try {
       const page = session.page;
       const url = page.url();
-      
+
       // Detect captcha type
       const captchaInfo = await detectCaptchaType(page);
-      
+
       if (!captchaInfo.type || !captchaInfo.siteKey) {
         logger.info('No captcha detected on page');
         return false;
@@ -198,37 +201,24 @@ export class StagehandService extends Service {
       logger.info(`Detected ${captchaInfo.type} captcha with sitekey: ${captchaInfo.siteKey}`);
 
       let solution: string;
-      
+
       switch (captchaInfo.type) {
         case 'turnstile':
-          solution = await this.capSolver.solveTurnstile(
-            url,
-            captchaInfo.siteKey
-          );
+          solution = await this.capSolver.solveTurnstile(url, captchaInfo.siteKey);
           break;
-          
+
         case 'recaptcha-v2':
-          solution = await this.capSolver.solveRecaptchaV2(
-            url,
-            captchaInfo.siteKey
-          );
+          solution = await this.capSolver.solveRecaptchaV2(url, captchaInfo.siteKey);
           break;
-          
+
         case 'recaptcha-v3':
-          solution = await this.capSolver.solveRecaptchaV3(
-            url,
-            captchaInfo.siteKey,
-            'login'
-          );
+          solution = await this.capSolver.solveRecaptchaV3(url, captchaInfo.siteKey, 'login');
           break;
-          
+
         case 'hcaptcha':
-          solution = await this.capSolver.solveHCaptcha(
-            url,
-            captchaInfo.siteKey
-          );
+          solution = await this.capSolver.solveHCaptcha(url, captchaInfo.siteKey);
           break;
-          
+
         default:
           logger.error('Unknown captcha type');
           return false;
@@ -237,7 +227,7 @@ export class StagehandService extends Service {
       // Inject solution
       await injectCaptchaSolution(page, captchaInfo.type, solution);
       logger.info(`${captchaInfo.type} captcha solved and injected`);
-      
+
       return true;
     } catch (error) {
       logger.error('Error handling captcha:', error);
@@ -309,7 +299,7 @@ const browserNavigateAction: Action = {
         const error = new StagehandError(
           'No URL found in message',
           'NO_URL_FOUND',
-          'I couldn\'t find a URL in your request. Please provide a valid URL to navigate to.',
+          "I couldn't find a URL in your request. Please provide a valid URL to navigate to.",
           false
         );
         handleBrowserError(error, callback, 'navigate to a page');
@@ -355,7 +345,7 @@ const browserNavigateAction: Action = {
       return responseContent;
     } catch (error) {
       logger.error('Error in BROWSER_NAVIGATE action:', error);
-      
+
       if (error instanceof StagehandError) {
         handleBrowserError(error, callback);
       } else {
@@ -643,7 +633,7 @@ const browserClickAction: Action = {
     const service = runtime.getService(StagehandService.serviceType) as StagehandService;
     const session = await service?.getCurrentSession();
     if (!session) return false;
-    
+
     // Check if message contains click intent
     const text = message.content.text?.toLowerCase() || '';
     return text.includes('click') || text.includes('tap') || text.includes('press');
@@ -723,9 +713,14 @@ const browserTypeAction: Action = {
     const service = runtime.getService(StagehandService.serviceType) as StagehandService;
     const session = await service?.getCurrentSession();
     if (!session) return false;
-    
+
     const text = message.content.text?.toLowerCase() || '';
-    return text.includes('type') || text.includes('enter') || text.includes('fill') || text.includes('input');
+    return (
+      text.includes('type') ||
+      text.includes('enter') ||
+      text.includes('fill') ||
+      text.includes('input')
+    );
   },
 
   handler: async (
@@ -748,8 +743,9 @@ const browserTypeAction: Action = {
 
       // Parse the message to extract what to type and where
       const text = message.content.text || '';
-      const match = text.match(/(?:type|enter|fill|input)\s+["']([^"']+)["']\s+(?:in|into|to)?\s+(.+)/i) ||
-                    text.match(/(?:type|enter|fill|input)\s+(.+?)\s+(?:in|into|to)\s+(.+)/i);
+      const match =
+        text.match(/(?:type|enter|fill|input)\s+["']([^"']+)["']\s+(?:in|into|to)?\s+(.+)/i) ||
+        text.match(/(?:type|enter|fill|input)\s+(.+?)\s+(?:in|into|to)\s+(.+)/i);
 
       if (!match) {
         throw new Error('Could not parse type command. Use format: "type \'text\' in field"');
@@ -809,7 +805,7 @@ const browserSelectAction: Action = {
     const service = runtime.getService(StagehandService.serviceType) as StagehandService;
     const session = await service?.getCurrentSession();
     if (!session) return false;
-    
+
     const text = message.content.text?.toLowerCase() || '';
     return text.includes('select') || text.includes('choose') || text.includes('pick');
   },
@@ -833,11 +829,14 @@ const browserSelectAction: Action = {
       }
 
       const text = message.content.text || '';
-      const match = text.match(/(?:select|choose|pick)\s+["']([^"']+)["']\s+(?:from|in)?\s+(.+)/i) ||
-                    text.match(/(?:select|choose|pick)\s+(.+?)\s+(?:from|in)\s+(.+)/i);
+      const match =
+        text.match(/(?:select|choose|pick)\s+["']([^"']+)["']\s+(?:from|in)?\s+(.+)/i) ||
+        text.match(/(?:select|choose|pick)\s+(.+?)\s+(?:from|in)\s+(.+)/i);
 
       if (!match) {
-        throw new Error('Could not parse select command. Use format: "select \'option\' from dropdown"');
+        throw new Error(
+          'Could not parse select command. Use format: "select \'option\' from dropdown"'
+        );
       }
 
       const [, optionToSelect, dropdownDescription] = match;
@@ -894,9 +893,14 @@ const browserExtractAction: Action = {
     const service = runtime.getService(StagehandService.serviceType) as StagehandService;
     const session = await service?.getCurrentSession();
     if (!session) return false;
-    
+
     const text = message.content.text?.toLowerCase() || '';
-    return text.includes('extract') || text.includes('get') || text.includes('read') || text.includes('find');
+    return (
+      text.includes('extract') ||
+      text.includes('get') ||
+      text.includes('read') ||
+      text.includes('find')
+    );
   },
 
   handler: async (
@@ -930,7 +934,7 @@ const browserExtractAction: Action = {
       });
 
       const responseContent: Content = {
-        text: extractedData.found 
+        text: extractedData.found
           ? `I found the following: "${extractedData.data}"`
           : 'I could not find the requested information on this page',
         actions: ['BROWSER_EXTRACT'],
@@ -979,7 +983,7 @@ const browserScreenshotAction: Action = {
     const service = runtime.getService(StagehandService.serviceType) as StagehandService;
     const session = await service?.getCurrentSession();
     if (!session) return false;
-    
+
     const text = message.content.text?.toLowerCase() || '';
     return text.includes('screenshot') || text.includes('capture') || text.includes('snapshot');
   },
@@ -1012,7 +1016,7 @@ const browserScreenshotAction: Action = {
       const base64Screenshot = screenshot.toString('base64');
 
       const responseContent: Content = {
-        text: 'I\'ve taken a screenshot of the current page',
+        text: "I've taken a screenshot of the current page",
         actions: ['BROWSER_SCREENSHOT'],
         source: message.content.source,
         data: {
@@ -1041,7 +1045,7 @@ const browserScreenshotAction: Action = {
       {
         name: '{{agent}}',
         content: {
-          text: 'I\'ve taken a screenshot of the current page',
+          text: "I've taken a screenshot of the current page",
           actions: ['BROWSER_SCREENSHOT'],
         },
       },
@@ -1062,7 +1066,7 @@ const browserSolveCaptchaAction: Action = {
     const service = runtime.getService(StagehandService.serviceType) as StagehandService;
     const session = await service?.getCurrentSession();
     if (!session) return false;
-    
+
     // Check if CapSolver is configured
     return !!process.env.CAPSOLVER_API_KEY;
   },
@@ -1089,8 +1093,8 @@ const browserSolveCaptchaAction: Action = {
       const solved = await (service as any).handleCaptcha(session);
 
       const responseContent: Content = {
-        text: solved 
-          ? 'I\'ve successfully solved the CAPTCHA on this page'
+        text: solved
+          ? "I've successfully solved the CAPTCHA on this page"
           : 'No CAPTCHA was detected on this page',
         actions: ['BROWSER_SOLVE_CAPTCHA'],
         source: message.content.source,
@@ -1117,7 +1121,7 @@ const browserSolveCaptchaAction: Action = {
       {
         name: '{{agent}}',
         content: {
-          text: 'I\'ve successfully solved the CAPTCHA on this page',
+          text: "I've successfully solved the CAPTCHA on this page",
           actions: ['BROWSER_SOLVE_CAPTCHA'],
         },
       },
@@ -1197,19 +1201,19 @@ const stagehandE2ETestSuite = {
 
         // Create a session
         const session = await service.createSession('test-navigation-session');
-        
+
         // Navigate to a URL
         await session.page.goto('https://example.com');
         await session.page.waitForLoadState('domcontentloaded');
-        
+
         // Verify we're on the right page
         const url = session.page.url();
         const title = await session.page.title();
-        
+
         if (!url.includes('example.com')) {
           throw new Error(`Expected URL to contain example.com, got ${url}`);
         }
-        
+
         if (!title) {
           throw new Error('Expected page to have a title');
         }
@@ -1234,18 +1238,18 @@ const stagehandE2ETestSuite = {
 
         // Create a session
         const session = await service.createSession('test-captcha-session');
-        
+
         // Navigate to a demo page with CAPTCHA
         await session.page.goto('https://2captcha.com/demo/cloudflare-turnstile');
         await session.page.waitForLoadState('networkidle');
-        
+
         // Detect CAPTCHA
         const captchaInfo = await detectCaptchaType(session.page);
-        
+
         if (!captchaInfo.type) {
           throw new Error('Expected to detect a CAPTCHA on the demo page');
         }
-        
+
         logger.info(`Detected ${captchaInfo.type} CAPTCHA`);
 
         // Clean up
@@ -1258,7 +1262,7 @@ const stagehandE2ETestSuite = {
         const username = runtime.getSetting('TRUTHSOCIAL_USERNAME');
         const password = runtime.getSetting('TRUTHSOCIAL_PASSWORD');
         const capSolverKey = runtime.getSetting('CAPSOLVER_API_KEY');
-        
+
         if (!username || !password) {
           logger.warn('Skipping Truth Social test - credentials not configured');
           return;
@@ -1270,30 +1274,30 @@ const stagehandE2ETestSuite = {
         }
 
         const session = await service.createSession('test-truthsocial-session');
-        
+
         try {
           // Navigate to Truth Social login
           await session.page.goto('https://truthsocial.com/login');
           await session.page.waitForLoadState('networkidle');
-          
+
           // Type username
           await session.stagehand.act({
             action: `type "${username}" into the username field`,
           });
-          
+
           // Type password
           await session.stagehand.act({
             action: `type "${password}" into the password field`,
           });
-          
+
           // Click login
           await session.stagehand.act({
             action: 'click on the login button',
           });
-          
+
           // Wait for potential CAPTCHA
-          await new Promise(resolve => setTimeout(resolve, 3000));
-          
+          await new Promise((resolve) => setTimeout(resolve, 3000));
+
           // Check for CAPTCHA and solve if present
           if (capSolverKey) {
             const handled = await (service as any).handleCaptcha(session);
@@ -1301,10 +1305,10 @@ const stagehandE2ETestSuite = {
               logger.info('CAPTCHA was solved successfully');
             }
           }
-          
+
           // Wait for login to complete
-          await new Promise(resolve => setTimeout(resolve, 5000));
-          
+          await new Promise((resolve) => setTimeout(resolve, 5000));
+
           // Try to extract user info to verify login
           const userInfo = await session.stagehand.extract({
             instruction: 'Extract the username or profile name',
@@ -1313,13 +1317,13 @@ const stagehandE2ETestSuite = {
               found: z.boolean(),
             }) as any,
           });
-          
+
           if (userInfo.found && userInfo.username) {
             logger.info(`Login successful! Found user: ${userInfo.username}`);
           } else {
             logger.warn('Could not verify login success');
           }
-          
+
           // Extract bearer token from localStorage or sessionStorage
           let bearerToken: string | null = null;
           try {
@@ -1327,11 +1331,11 @@ const stagehandE2ETestSuite = {
               // Check localStorage
               const localToken = localStorage.getItem('access_token');
               if (localToken) return localToken;
-              
+
               // Check sessionStorage
               const sessionToken = sessionStorage.getItem('access_token');
               if (sessionToken) return sessionToken;
-              
+
               // Check for token in various common keys
               const keys = ['auth_token', 'authToken', 'bearer', 'token', 'jwt'];
               for (const key of keys) {
@@ -1340,34 +1344,38 @@ const stagehandE2ETestSuite = {
                 const session = sessionStorage.getItem(key);
                 if (session) return session;
               }
-              
+
               // Try to get from window object
               if ((globalThis as any).authToken) return (globalThis as any).authToken;
               if ((globalThis as any).bearerToken) return (globalThis as any).bearerToken;
-              
+
               return null;
             });
-            
+
             if (bearerToken) {
-              logger.info(`Successfully retrieved bearer token: ${bearerToken.substring(0, 20)}...`);
+              logger.info(
+                `Successfully retrieved bearer token: ${bearerToken.substring(0, 20)}...`
+              );
             } else {
               logger.warn('Bearer token not found in storage');
-              
+
               // Try to intercept network requests to get the token
               const cdp = await session.page.context().newCDPSession(session.page);
               await cdp.send('Network.enable');
-              
+
               // Set up request interception
               await new Promise<void>((resolve) => {
                 cdp.on('Network.responseReceived', (event: any) => {
                   const headers = event.response.headers;
                   if (headers.authorization) {
                     bearerToken = headers.authorization.replace('Bearer ', '');
-                    logger.info(`Intercepted bearer token from network: ${bearerToken.substring(0, 20)}...`);
+                    logger.info(
+                      `Intercepted bearer token from network: ${bearerToken.substring(0, 20)}...`
+                    );
                     resolve();
                   }
                 });
-                
+
                 // Wait max 5 seconds for token
                 setTimeout(() => resolve(), 5000);
               });
@@ -1375,14 +1383,13 @@ const stagehandE2ETestSuite = {
           } catch (error) {
             logger.error('Error retrieving bearer token:', error);
           }
-          
+
           // Log test results
           logger.info('Truth Social login test results:', {
             loginSuccess: userInfo.found && !!userInfo.username,
             username: userInfo.username,
             bearerToken: bearerToken ? `${bearerToken.substring(0, 20)}...` : null,
           });
-          
         } finally {
           // Clean up
           await service.destroySession('test-truthsocial-session');
@@ -1394,7 +1401,7 @@ const stagehandE2ETestSuite = {
       fn: async (runtime: IAgentRuntime) => {
         const username = runtime.getSetting('TRUTHSOCIAL_USERNAME');
         const password = runtime.getSetting('TRUTHSOCIAL_PASSWORD');
-        
+
         if (!username || !password) {
           logger.warn('Skipping Truth Social compose test - credentials not configured');
           return;
@@ -1406,31 +1413,31 @@ const stagehandE2ETestSuite = {
         }
 
         const session = await service.createSession('test-compose-session');
-        
+
         try {
           // Navigate to Truth Social
           await session.page.goto('https://truthsocial.com/');
           await session.page.waitForTimeout(2000);
-          
+
           // Click Sign In
           await session.page.click('button:has-text("Sign In")');
           await session.page.waitForTimeout(2000);
-          
+
           // Login
           await session.page.fill('input[type="text"]', username);
           await session.page.fill('input[type="password"]', password);
           await session.page.click('button[type="submit"]');
-          
+
           // Wait for login and check for CAPTCHA
           await session.page.waitForTimeout(3000);
           const handled = await (service as any).handleCaptcha(session);
           if (handled) {
             logger.info('CAPTCHA was solved');
           }
-          
+
           // Wait for redirect to home
           await session.page.waitForTimeout(5000);
-          
+
           // Extract bearer token after login
           let bearerToken: string | null = null;
           try {
@@ -1445,37 +1452,220 @@ const stagehandE2ETestSuite = {
               }
               return null;
             });
-            
+
             if (bearerToken) {
-              logger.info(`Bearer token retrieved in compose test: ${bearerToken.substring(0, 20)}...`);
+              logger.info(
+                `Bearer token retrieved in compose test: ${bearerToken.substring(0, 20)}...`
+              );
             }
           } catch (error) {
             logger.warn('Could not retrieve bearer token:', error);
           }
-          
+
           // Click the Compose button on the left sidebar
-          const composeButton = await session.page.waitForSelector('button:has-text("Compose")', { timeout: 10000 });
+          const composeButton = await session.page.waitForSelector('button:has-text("Compose")', {
+            timeout: 10000,
+          });
           await composeButton.click();
           logger.info('Clicked Compose button');
-          
+
           // Wait for compose modal
           await session.page.waitForTimeout(2000);
-          
+
           // Type post content
           const timestamp = new Date().toISOString();
           const postContent = `🤖 E2E test post from ElizaOS browser plugin - ${timestamp}`;
           await session.page.keyboard.type(postContent);
           logger.info('Typed post content');
-          
+
           // Submit post
           await session.page.click('button:has-text("Truth")');
           logger.info('Submitted post');
-          
+
           await session.page.waitForTimeout(3000);
           logger.info('Post created successfully!');
-          
         } finally {
           await service.destroySession('test-compose-session');
+        }
+      },
+    },
+    {
+      name: 'tiktok_login_and_upload',
+      fn: async (runtime: IAgentRuntime) => {
+        const username = runtime.getSetting('TIKTOK_USERNAME');
+        const password = runtime.getSetting('TIKTOK_PASSWORD');
+        const videoPath = runtime.getSetting('TIKTOK_TEST_VIDEO_PATH');
+
+        if (!username || !password) {
+          logger.warn('Skipping TikTok test - credentials not configured');
+          return;
+        }
+
+        if (!videoPath) {
+          logger.warn('Skipping TikTok test - TIKTOK_TEST_VIDEO_PATH not configured');
+          return;
+        }
+
+        const service = runtime.getService(StagehandService.serviceType) as StagehandService;
+        if (!service) {
+          throw new Error('StagehandService not available');
+        }
+
+        const session = await service.createSession('test-tiktok-session');
+
+        try {
+          // Navigate to TikTok
+          await session.page.goto('https://www.tiktok.com/login');
+          await session.page.waitForLoadState('networkidle');
+
+          // Click on "Use phone / email / username"
+          await session.stagehand.act({
+            action: 'click on "Use phone / email / username" option',
+          });
+
+          await session.page.waitForTimeout(2000);
+
+          // Click on "Log in with email or username"
+          await session.stagehand.act({
+            action: 'click on "Log in with email or username"',
+          });
+
+          await session.page.waitForTimeout(2000);
+
+          // Enter username
+          await session.stagehand.act({
+            action: `type "${username}" into the email or username field`,
+          });
+
+          // Enter password
+          await session.stagehand.act({
+            action: `type "${password}" into the password field`,
+          });
+
+          // Click login button
+          await session.stagehand.act({
+            action: 'click the Log in button',
+          });
+
+          // Wait for potential CAPTCHA
+          await session.page.waitForTimeout(3000);
+
+          // Check for CAPTCHA and solve if present
+          const capSolverKey = runtime.getSetting('CAPSOLVER_API_KEY');
+          if (capSolverKey) {
+            const handled = await (service as any).handleCaptcha(session);
+            if (handled) {
+              logger.info('TikTok CAPTCHA was solved successfully');
+            }
+          }
+
+          // Wait for login to complete
+          await session.page.waitForTimeout(5000);
+
+          // Extract auth token/session info
+          let authToken: string | null = null;
+          try {
+            authToken = await session.page.evaluate(() => {
+              // Check common TikTok token storage locations
+              const keys = ['sessionid', 'tt_webid', 'tt_csrf_token', 'access_token', 'auth_token'];
+              for (const key of keys) {
+                const cookie = (globalThis as any).document?.cookie
+                  ?.split('; ')
+                  .find((row: string) => row.startsWith(key));
+                if (cookie) return cookie.split('=')[1];
+
+                const local = localStorage.getItem(key);
+                if (local) return local;
+
+                const session = sessionStorage.getItem(key);
+                if (session) return session;
+              }
+              return null;
+            });
+
+            if (authToken) {
+              logger.info(`TikTok auth token retrieved: ${authToken.substring(0, 20)}...`);
+            }
+          } catch (error) {
+            logger.warn('Could not retrieve TikTok auth token:', error);
+          }
+
+          // Navigate to upload page
+          await session.page.goto('https://www.tiktok.com/upload');
+          await session.page.waitForTimeout(3000);
+
+          // Upload video file
+          const fileInput = await session.page.waitForSelector('input[type="file"]', {
+            timeout: 10000,
+          });
+          await fileInput.setInputFiles(videoPath);
+          logger.info(`Uploaded video file: ${videoPath}`);
+
+          // Wait for upload to process
+          await session.page.waitForTimeout(5000);
+
+          // Add caption
+          const caption = `🤖 Test upload from ElizaOS browser plugin - ${new Date().toISOString()}`;
+          await session.stagehand.act({
+            action: `type "${caption}" into the caption/description field`,
+          });
+
+          logger.info('Added video caption');
+
+          // Optional: Add hashtags
+          await session.stagehand.act({
+            action: 'click in the caption field and add #test #automation #elizaos at the end',
+          });
+
+          // Set privacy settings (optional)
+          try {
+            await session.stagehand.act({
+              action: 'click on "Who can view this video" and select "Private" option',
+            });
+            logger.info('Set video to private for testing');
+          } catch (error) {
+            logger.warn('Could not set privacy settings, continuing with defaults');
+          }
+
+          // Click Post button
+          await session.stagehand.act({
+            action: 'click the Post or Publish button',
+          });
+
+          logger.info('Clicked post button, waiting for upload confirmation');
+
+          // Wait for upload confirmation
+          await session.page.waitForTimeout(10000);
+
+          // Try to extract upload result
+          const uploadResult = await session.stagehand.extract({
+            instruction: 'Extract any success message or video URL after upload',
+            schema: z.object({
+              success: z.boolean(),
+              message: z.string().optional(),
+              videoUrl: z.string().optional(),
+            }) as any,
+          });
+
+          if (uploadResult.success) {
+            logger.info('TikTok video uploaded successfully!', uploadResult);
+          } else {
+            logger.warn('Could not confirm upload success', uploadResult);
+          }
+
+          // Log final results
+          logger.info('TikTok test completed', {
+            loginSuccess: !!authToken,
+            uploadAttempted: true,
+            authToken: authToken ? `${authToken.substring(0, 20)}...` : null,
+            uploadResult,
+          });
+        } catch (error) {
+          logger.error('Error in TikTok test:', error);
+          throw error;
+        } finally {
+          // Clean up
+          await service.destroySession('test-tiktok-session');
         }
       },
     },
@@ -1498,9 +1688,20 @@ const stagehandE2ETestSuite = {
         } as Memory;
 
         // Validate the navigate action exists
-        const actions = [browserNavigateAction, browserBackAction, browserForwardAction, browserRefreshAction, browserClickAction, browserTypeAction, browserSelectAction, browserExtractAction, browserScreenshotAction, browserSolveCaptchaAction];
-        const navigateAction = actions.find(a => a.name === 'BROWSER_NAVIGATE');
-        
+        const actions = [
+          browserNavigateAction,
+          browserBackAction,
+          browserForwardAction,
+          browserRefreshAction,
+          browserClickAction,
+          browserTypeAction,
+          browserSelectAction,
+          browserExtractAction,
+          browserScreenshotAction,
+          browserSolveCaptchaAction,
+        ];
+        const navigateAction = actions.find((a) => a.name === 'BROWSER_NAVIGATE');
+
         if (!navigateAction) {
           throw new Error('Navigate action not found');
         }
@@ -1532,6 +1733,9 @@ export const stagehandPlugin: Plugin = {
     CAPSOLVER_API_KEY: process.env.CAPSOLVER_API_KEY,
     TRUTHSOCIAL_USERNAME: process.env.TRUTHSOCIAL_USERNAME,
     TRUTHSOCIAL_PASSWORD: process.env.TRUTHSOCIAL_PASSWORD,
+    TIKTOK_USERNAME: process.env.TIKTOK_USERNAME,
+    TIKTOK_PASSWORD: process.env.TIKTOK_PASSWORD,
+    TIKTOK_TEST_VIDEO_PATH: process.env.TIKTOK_TEST_VIDEO_PATH,
   },
   async init(config: Record<string, string>) {
     logger.info('Initializing Stagehand browser automation plugin');
@@ -1556,7 +1760,18 @@ export const stagehandPlugin: Plugin = {
   },
   services: [StagehandService],
   tests: [stagehandE2ETestSuite],
-  actions: [browserNavigateAction, browserBackAction, browserForwardAction, browserRefreshAction, browserClickAction, browserTypeAction, browserSelectAction, browserExtractAction, browserScreenshotAction, browserSolveCaptchaAction],
+  actions: [
+    browserNavigateAction,
+    browserBackAction,
+    browserForwardAction,
+    browserRefreshAction,
+    browserClickAction,
+    browserTypeAction,
+    browserSelectAction,
+    browserExtractAction,
+    browserScreenshotAction,
+    browserSolveCaptchaAction,
+  ],
   providers: [browserStateProvider],
   events: {
     BROWSER_PAGE_LOADED: [

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { stagehandPlugin, StagehandService, BrowserSession } from '../index';
-import { createMockRuntime, createMockMemory, createMockState, setupLoggerSpies } from './test-utils';
+import {
+  createMockRuntime,
+  createMockMemory,
+  createMockState,
+  setupLoggerSpies,
+} from './test-utils';
 import { type HandlerCallback, type Memory, type State, type IAgentRuntime } from '@elizaos/core';
 import { Stagehand } from '@browserbasehq/stagehand';
 
@@ -235,4 +240,4 @@ describe('Phase 2 Browser Actions', () => {
       });
     });
   });
-}); 
+});

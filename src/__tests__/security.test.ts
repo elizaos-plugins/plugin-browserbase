@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { 
+import {
   UrlValidator,
   InputSanitizer,
   validateSecureAction,
@@ -69,7 +69,7 @@ describe('UrlValidator', () => {
     it('should handle localhost URLs', () => {
       const result1 = validator.validateUrl('http://localhost:3000');
       expect(result1.valid).toBe(true);
-      
+
       const result2 = validator.validateUrl('http://127.0.0.1:8080');
       expect(result2.valid).toBe(true);
     });
@@ -89,12 +89,12 @@ describe('UrlValidator', () => {
 
     it('should enforce allowed domains when configured', () => {
       validator = new UrlValidator({
-        allowedDomains: ['github.com', 'example.com']
+        allowedDomains: ['github.com', 'example.com'],
       });
-      
+
       const result1 = validator.validateUrl('https://github.com/user/repo');
       expect(result1.valid).toBe(true);
-      
+
       const result2 = validator.validateUrl('https://google.com');
       expect(result2.valid).toBe(false);
       expect(result2.error).toBe('Domain is not in the allowed list');
@@ -102,9 +102,9 @@ describe('UrlValidator', () => {
 
     it('should allow subdomains of allowed domains', () => {
       validator = new UrlValidator({
-        allowedDomains: ['example.com']
+        allowedDomains: ['example.com'],
       });
-      
+
       const result = validator.validateUrl('https://api.example.com');
       expect(result.valid).toBe(true);
     });
@@ -113,7 +113,7 @@ describe('UrlValidator', () => {
   describe('config updates', () => {
     it('should update configuration', () => {
       validator.updateConfig({ maxUrlLength: 100 });
-      
+
       const longUrl = 'https://example.com/' + 'a'.repeat(100);
       const result = validator.validateUrl(longUrl);
       expect(result.valid).toBe(false);
@@ -201,8 +201,9 @@ describe('validateSecureAction', () => {
   });
 
   it('should throw BrowserSecurityError for invalid URLs', () => {
-    expect(() => validateSecureAction('https://malware.com', validator))
-      .toThrow(BrowserSecurityError);
+    expect(() => validateSecureAction('https://malware.com', validator)).toThrow(
+      BrowserSecurityError
+    );
   });
 
   it('should include error details', () => {
@@ -259,7 +260,7 @@ describe('RateLimiter', () => {
 
       // Advance time by 1 minute
       vi.spyOn(Date, 'now').mockReturnValue(now + 60001);
-      
+
       expect(rateLimiter.checkActionLimit('user1')).toBe(true);
     });
 
@@ -293,7 +294,7 @@ describe('RateLimiter', () => {
 
       // Advance time by 1 hour
       vi.spyOn(Date, 'now').mockReturnValue(now + 3600001);
-      
+
       expect(rateLimiter.checkSessionLimit('user1')).toBe(true);
     });
 
@@ -304,4 +305,4 @@ describe('RateLimiter', () => {
       expect(rateLimiter.checkSessionLimit('user2')).toBe(true);
     });
   });
-}); 
+});

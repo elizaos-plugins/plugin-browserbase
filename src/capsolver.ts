@@ -110,7 +110,12 @@ export class CapSolverService {
   /**
    * Solve Cloudflare Turnstile
    */
-  async solveTurnstile(websiteURL: string, websiteKey: string, proxy?: string, userAgent?: string): Promise<string> {
+  async solveTurnstile(
+    websiteURL: string,
+    websiteKey: string,
+    proxy?: string,
+    userAgent?: string
+  ): Promise<string> {
     logger.info('Solving Cloudflare Turnstile captcha');
 
     const task: CaptchaTask = {
@@ -143,7 +148,12 @@ export class CapSolverService {
   /**
    * Solve reCAPTCHA v2
    */
-  async solveRecaptchaV2(websiteURL: string, websiteKey: string, isInvisible = false, proxy?: string): Promise<string> {
+  async solveRecaptchaV2(
+    websiteURL: string,
+    websiteKey: string,
+    isInvisible = false,
+    proxy?: string
+  ): Promise<string> {
     logger.info('Solving reCAPTCHA v2');
 
     const task: CaptchaTask = {
@@ -242,7 +252,10 @@ export async function detectCaptchaType(page: any): Promise<{
     // Check for Cloudflare Turnstile
     const turnstileElement = await page.$('[data-sitekey]');
     if (turnstileElement) {
-      const siteKey = await page.evaluate((el: any) => el.getAttribute('data-sitekey'), turnstileElement);
+      const siteKey = await page.evaluate(
+        (el: any) => el.getAttribute('data-sitekey'),
+        turnstileElement
+      );
       if (siteKey && (await page.$('.cf-turnstile'))) {
         return { type: 'turnstile', siteKey };
       }
@@ -251,8 +264,8 @@ export async function detectCaptchaType(page: any): Promise<{
     // Check for reCAPTCHA
     const recaptchaElement = await page.$('[data-sitekey], .g-recaptcha');
     if (recaptchaElement) {
-      const siteKey = await page.evaluate((el: any) => 
-        el.getAttribute('data-sitekey') || el.getAttribute('data-site-key'), 
+      const siteKey = await page.evaluate(
+        (el: any) => el.getAttribute('data-sitekey') || el.getAttribute('data-site-key'),
         recaptchaElement
       );
       if (siteKey) {
@@ -267,8 +280,8 @@ export async function detectCaptchaType(page: any): Promise<{
     // Check for hCaptcha
     const hcaptchaElement = await page.$('[data-sitekey].h-captcha, [data-hcaptcha-sitekey]');
     if (hcaptchaElement) {
-      const siteKey = await page.evaluate((el: any) => 
-        el.getAttribute('data-sitekey') || el.getAttribute('data-hcaptcha-sitekey'), 
+      const siteKey = await page.evaluate(
+        (el: any) => el.getAttribute('data-sitekey') || el.getAttribute('data-hcaptcha-sitekey'),
         hcaptchaElement
       );
       if (siteKey) {
@@ -286,7 +299,11 @@ export async function detectCaptchaType(page: any): Promise<{
 /**
  * Inject CAPTCHA solution into the page
  */
-export async function injectCaptchaSolution(page: any, captchaType: string, solution: string): Promise<void> {
+export async function injectCaptchaSolution(
+  page: any,
+  captchaType: string,
+  solution: string
+): Promise<void> {
   switch (captchaType) {
     case 'turnstile':
       await page.evaluate((token: string) => {
@@ -343,4 +360,4 @@ export async function injectCaptchaSolution(page: any, captchaType: string, solu
       }, solution);
       break;
   }
-} 
+}

@@ -113,7 +113,7 @@ describe('CapSolverService', () => {
         });
 
       // Reduce polling interval for testing
-      const fastCapSolver = new CapSolverService({ 
+      const fastCapSolver = new CapSolverService({
         apiKey: mockApiKey,
         pollingInterval: 10, // 10ms for testing
       });
@@ -132,13 +132,15 @@ describe('CapSolverService', () => {
         },
       });
 
-      const fastCapSolver = new CapSolverService({ 
+      const fastCapSolver = new CapSolverService({
         apiKey: mockApiKey,
         pollingInterval: 10,
         retryAttempts: 2,
       });
 
-      await expect(fastCapSolver.getTaskResult('task-123')).rejects.toThrow('CapSolver task timeout');
+      await expect(fastCapSolver.getTaskResult('task-123')).rejects.toThrow(
+        'CapSolver task timeout'
+      );
     });
   });
 
@@ -198,17 +200,14 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-456' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { gRecaptchaResponse: 'recaptcha-v2-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { gRecaptchaResponse: 'recaptcha-v2-token' },
           },
         });
 
-      const result = await capSolver.solveRecaptchaV2(
-        'https://example.com',
-        'v2-site-key'
-      );
+      const result = await capSolver.solveRecaptchaV2('https://example.com', 'v2-site-key');
 
       expect(result).toBe('recaptcha-v2-token');
       expect(logger.info).toHaveBeenCalledWith('Solving reCAPTCHA v2');
@@ -220,18 +219,14 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-789' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { gRecaptchaResponse: 'invisible-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { gRecaptchaResponse: 'invisible-token' },
           },
         });
 
-      const result = await capSolver.solveRecaptchaV2(
-        'https://example.com',
-        'invisible-key',
-        true
-      );
+      const result = await capSolver.solveRecaptchaV2('https://example.com', 'invisible-key', true);
 
       expect(result).toBe('invisible-token');
       expect(axios.post).toHaveBeenCalledWith(
@@ -253,18 +248,14 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-v3' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { gRecaptchaResponse: 'v3-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { gRecaptchaResponse: 'v3-token' },
           },
         });
 
-      const result = await capSolver.solveRecaptchaV3(
-        'https://example.com',
-        'v3-key',
-        'verify'
-      );
+      const result = await capSolver.solveRecaptchaV3('https://example.com', 'v3-key', 'verify');
 
       expect(result).toBe('v3-token');
       expect(logger.info).toHaveBeenCalledWith('Solving reCAPTCHA v3');
@@ -276,10 +267,10 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-v3-custom' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { gRecaptchaResponse: 'v3-custom-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { gRecaptchaResponse: 'v3-custom-token' },
           },
         });
 
@@ -311,17 +302,14 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-hcaptcha' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { token: 'hcaptcha-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { token: 'hcaptcha-token' },
           },
         });
 
-      const result = await capSolver.solveHCaptcha(
-        'https://example.com',
-        'hcaptcha-key'
-      );
+      const result = await capSolver.solveHCaptcha('https://example.com', 'hcaptcha-key');
 
       expect(result).toBe('hcaptcha-token');
       expect(logger.info).toHaveBeenCalledWith('Solving hCaptcha');
@@ -333,10 +321,10 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-hcaptcha-proxy' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { token: 'hcaptcha-proxy-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { token: 'hcaptcha-proxy-token' },
           },
         });
 
@@ -365,13 +353,18 @@ describe('CapSolverService', () => {
     it('should handle network errors', async () => {
       vi.mocked(axios.post).mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(capSolver.createTask({
-        type: 'AntiTurnstileTaskProxyLess',
-        websiteURL: 'https://example.com',
-        websiteKey: 'test-key',
-      })).rejects.toThrow('Network error');
+      await expect(
+        capSolver.createTask({
+          type: 'AntiTurnstileTaskProxyLess',
+          websiteURL: 'https://example.com',
+          websiteKey: 'test-key',
+        })
+      ).rejects.toThrow('Network error');
 
-      expect(logger.error).toHaveBeenCalledWith('Error creating CapSolver task:', expect.any(Error));
+      expect(logger.error).toHaveBeenCalledWith(
+        'Error creating CapSolver task:',
+        expect.any(Error)
+      );
     });
 
     it('should handle invalid proxy format', async () => {
@@ -380,19 +373,17 @@ describe('CapSolverService', () => {
           data: { errorId: 0, taskId: 'task-proxy-error' },
         })
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { token: 'proxy-error-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { token: 'proxy-error-token' },
           },
         });
 
       // Should not throw, but handle gracefully
-      await expect(capSolver.solveTurnstile(
-        'https://example.com',
-        'site-key',
-        'invalid-proxy'
-      )).resolves.toBe('proxy-error-token');
+      await expect(
+        capSolver.solveTurnstile('https://example.com', 'site-key', 'invalid-proxy')
+      ).resolves.toBe('proxy-error-token');
     });
 
     it('should retry on task polling errors', async () => {
@@ -402,18 +393,17 @@ describe('CapSolverService', () => {
         })
         .mockRejectedValueOnce(new Error('Temporary error'))
         .mockResolvedValueOnce({
-          data: { 
-            errorId: 0, 
-            status: 'ready', 
-            solution: { token: 'retry-token' } 
+          data: {
+            errorId: 0,
+            status: 'ready',
+            solution: { token: 'retry-token' },
           },
         });
 
       // This should fail because getTaskResult doesn't retry on errors
-      await expect(capSolver.solveTurnstile(
-        'https://example.com',
-        'site-key'
-      )).rejects.toThrow('Temporary error');
+      await expect(capSolver.solveTurnstile('https://example.com', 'site-key')).rejects.toThrow(
+        'Temporary error'
+      );
     });
   });
 });
@@ -451,9 +441,7 @@ describe('detectCaptchaType', () => {
       if (selector === '[data-sitekey], .g-recaptcha') return Promise.resolve(mockElement);
       return Promise.resolve(null);
     });
-    mockPage.evaluate
-      .mockResolvedValueOnce('recaptcha-sitekey')
-      .mockResolvedValueOnce(false); // Not v3
+    mockPage.evaluate.mockResolvedValueOnce('recaptcha-sitekey').mockResolvedValueOnce(false); // Not v3
 
     const result = await detectCaptchaType(mockPage);
 
@@ -469,9 +457,7 @@ describe('detectCaptchaType', () => {
       if (selector === '[data-sitekey], .g-recaptcha') return Promise.resolve(mockElement);
       return Promise.resolve(null);
     });
-    mockPage.evaluate
-      .mockResolvedValueOnce('recaptcha-sitekey')
-      .mockResolvedValueOnce(true); // Is v3
+    mockPage.evaluate.mockResolvedValueOnce('recaptcha-sitekey').mockResolvedValueOnce(true); // Is v3
 
     const result = await detectCaptchaType(mockPage);
 
@@ -520,27 +506,18 @@ describe('injectCaptchaSolution', () => {
   it('should inject Turnstile solution', async () => {
     await injectCaptchaSolution(mockPage, 'turnstile', 'test-token');
 
-    expect(mockPage.evaluate).toHaveBeenCalledWith(
-      expect.any(Function),
-      'test-token'
-    );
+    expect(mockPage.evaluate).toHaveBeenCalledWith(expect.any(Function), 'test-token');
   });
 
   it('should inject reCAPTCHA solution', async () => {
     await injectCaptchaSolution(mockPage, 'recaptcha-v2', 'test-token');
 
-    expect(mockPage.evaluate).toHaveBeenCalledWith(
-      expect.any(Function),
-      'test-token'
-    );
+    expect(mockPage.evaluate).toHaveBeenCalledWith(expect.any(Function), 'test-token');
   });
 
   it('should inject hCaptcha solution', async () => {
     await injectCaptchaSolution(mockPage, 'hcaptcha', 'test-token');
 
-    expect(mockPage.evaluate).toHaveBeenCalledWith(
-      expect.any(Function),
-      'test-token'
-    );
+    expect(mockPage.evaluate).toHaveBeenCalledWith(expect.any(Function), 'test-token');
   });
-}); 
+});

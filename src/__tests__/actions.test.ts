@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { stagehandPlugin, StagehandService, BrowserSession } from '../index';
-import { createMockRuntime, createMockMemory, createMockState, setupLoggerSpies } from './test-utils';
+import {
+  createMockRuntime,
+  createMockMemory,
+  createMockState,
+  setupLoggerSpies,
+} from './test-utils';
 import { HandlerCallback, Memory, State, UUID, logger } from '@elizaos/core';
 import { Stagehand } from '@browserbasehq/stagehand';
 
@@ -54,7 +59,7 @@ describe('BROWSER_NAVIGATE action', () => {
     // Create mock service and session
     mockRuntime = createMockRuntime();
     mockService = new StagehandService(mockRuntime);
-    
+
     // Create a mock Stagehand instance
     const mockStagehand = new Stagehand({ env: 'LOCAL' } as any);
     mockSession = new BrowserSession('test-session', mockStagehand as any);
@@ -129,7 +134,7 @@ describe('BROWSER_NAVIGATE action', () => {
       expect(mockSession.page.goto).toHaveBeenCalledWith('https://google.com');
       expect(mockSession.page.waitForLoadState).toHaveBeenCalledWith('domcontentloaded');
       expect(mockSession.page.title).toHaveBeenCalled();
-      
+
       expect(mockCallback).toHaveBeenCalledWith({
         text: 'I\'ve navigated to https://google.com. The page title is: "Test Page Title"',
         actions: ['BROWSER_NAVIGATE'],
@@ -155,7 +160,9 @@ describe('BROWSER_NAVIGATE action', () => {
         []
       );
 
-      expect(mockService.createSession).toHaveBeenCalledWith(expect.stringMatching(/^session-\d+$/));
+      expect(mockService.createSession).toHaveBeenCalledWith(
+        expect.stringMatching(/^session-\d+$/)
+      );
     });
 
     it('should handle domain without protocol', async () => {
@@ -197,8 +204,8 @@ describe('BROWSER_NAVIGATE action', () => {
           text: expect.stringContaining('browser automation service is not currently available'),
           error: expect.objectContaining({
             code: 'SERVICE_NOT_AVAILABLE',
-            recoverable: false
-          })
+            recoverable: false,
+          }),
         })
       );
     });
@@ -220,11 +227,11 @@ describe('BROWSER_NAVIGATE action', () => {
       // Check that callback was called with error response
       expect(mockCallback).toHaveBeenCalledWith(
         expect.objectContaining({
-          text: expect.stringContaining('couldn\'t find a URL in your request'),
+          text: expect.stringContaining("couldn't find a URL in your request"),
           error: expect.objectContaining({
             code: 'NO_URL_FOUND',
-            recoverable: false
-          })
+            recoverable: false,
+          }),
         })
       );
     });
@@ -251,7 +258,7 @@ describe('BROWSER_BACK action', () => {
 
     mockRuntime = createMockRuntime();
     mockService = new StagehandService(mockRuntime);
-    
+
     const mockStagehand = new Stagehand({ env: 'LOCAL' } as any);
     mockSession = new BrowserSession('test-session', mockStagehand as any);
 
@@ -271,7 +278,7 @@ describe('BROWSER_BACK action', () => {
 
     it('should not validate when no session exists', async () => {
       mockService.getCurrentSession = vi.fn().mockResolvedValue(undefined);
-      
+
       const message = createMockMemory();
       const isValid = await backAction.validate(mockRuntime, message as Memory, {} as State);
       expect(isValid).toBe(false);
@@ -279,7 +286,7 @@ describe('BROWSER_BACK action', () => {
 
     it('should not validate when service not available', async () => {
       mockRuntime.getService.mockReturnValue(null);
-      
+
       const message = createMockMemory();
       const isValid = await backAction.validate(mockRuntime, message as Memory, {} as State);
       expect(isValid).toBe(false);
@@ -318,14 +325,7 @@ describe('BROWSER_BACK action', () => {
 
       const message = createMockMemory();
 
-      await backAction.handler(
-        mockRuntime,
-        message as Memory,
-        {} as State,
-        {},
-        mockCallback,
-        []
-      );
+      await backAction.handler(mockRuntime, message as Memory, {} as State, {}, mockCallback, []);
 
       // Check that callback was called with error response
       expect(mockCallback).toHaveBeenCalledWith(
@@ -333,8 +333,8 @@ describe('BROWSER_BACK action', () => {
           text: expect.stringContaining('having trouble with the browser session'),
           error: expect.objectContaining({
             code: 'BROWSER_SESSION_ERROR',
-            recoverable: true
-          })
+            recoverable: true,
+          }),
         })
       );
     });
@@ -353,7 +353,7 @@ describe('BROWSER_FORWARD action', () => {
 
     mockRuntime = createMockRuntime();
     mockService = new StagehandService(mockRuntime);
-    
+
     const mockStagehand = new Stagehand({ env: 'LOCAL' } as any);
     mockSession = new BrowserSession('test-session', mockStagehand as any);
 
@@ -373,7 +373,7 @@ describe('BROWSER_FORWARD action', () => {
 
     it('should not validate when no session exists', async () => {
       mockService.getCurrentSession = vi.fn().mockResolvedValue(undefined);
-      
+
       const message = createMockMemory();
       const isValid = await forwardAction.validate(mockRuntime, message as Memory, {} as State);
       expect(isValid).toBe(false);
@@ -411,14 +411,7 @@ describe('BROWSER_FORWARD action', () => {
       const message = createMockMemory();
 
       await expect(
-        forwardAction.handler(
-          mockRuntime,
-          message as Memory,
-          {} as State,
-          {},
-          mockCallback,
-          []
-        )
+        forwardAction.handler(mockRuntime, message as Memory, {} as State, {}, mockCallback, [])
       ).rejects.toThrow('No active browser session');
     });
 
@@ -429,14 +422,7 @@ describe('BROWSER_FORWARD action', () => {
       const message = createMockMemory();
 
       await expect(
-        forwardAction.handler(
-          mockRuntime,
-          message as Memory,
-          {} as State,
-          {},
-          mockCallback,
-          []
-        )
+        forwardAction.handler(mockRuntime, message as Memory, {} as State, {}, mockCallback, [])
       ).rejects.toThrow('Page navigation failed');
 
       expect(logger.error).toHaveBeenCalledWith('Error in BROWSER_FORWARD action:', testError);
@@ -456,7 +442,7 @@ describe('BROWSER_REFRESH action', () => {
 
     mockRuntime = createMockRuntime();
     mockService = new StagehandService(mockRuntime);
-    
+
     const mockStagehand = new Stagehand({ env: 'LOCAL' } as any);
     mockSession = new BrowserSession('test-session', mockStagehand as any);
 
@@ -476,7 +462,7 @@ describe('BROWSER_REFRESH action', () => {
 
     it('should not validate when no session exists', async () => {
       mockService.getCurrentSession = vi.fn().mockResolvedValue(undefined);
-      
+
       const message = createMockMemory();
       const isValid = await refreshAction.validate(mockRuntime, message as Memory, {} as State);
       expect(isValid).toBe(false);
@@ -514,14 +500,7 @@ describe('BROWSER_REFRESH action', () => {
       const message = createMockMemory();
 
       await expect(
-        refreshAction.handler(
-          mockRuntime,
-          message as Memory,
-          {} as State,
-          {},
-          mockCallback,
-          []
-        )
+        refreshAction.handler(mockRuntime, message as Memory, {} as State, {}, mockCallback, [])
       ).rejects.toThrow('No active browser session');
     });
   });
@@ -546,4 +525,4 @@ describe('Browser actions metadata', () => {
     expect(refreshAction?.similes).toContain('RELOAD_PAGE');
     expect(refreshAction?.similes).toContain('REFRESH');
   });
-}); 
+});

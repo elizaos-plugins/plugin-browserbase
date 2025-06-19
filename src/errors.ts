@@ -141,7 +141,7 @@ export function handleBrowserError(
       code: stagehandError.code,
       message: stagehandError.message,
       recoverable: stagehandError.recoverable,
-      details: stagehandError.details
-    }
+      details: stagehandError.details,
+    },
   });
-} 
+}

@@ -96,8 +96,8 @@ export class UrlValidator {
 
       // Check against allowed domains (if specified)
       if (this.config.allowedDomains && this.config.allowedDomains.length > 0) {
-        const isAllowed = this.config.allowedDomains.some(allowed => 
-          parsedUrl.hostname === allowed || parsedUrl.hostname.endsWith(`.${allowed}`)
+        const isAllowed = this.config.allowedDomains.some(
+          (allowed) => parsedUrl.hostname === allowed || parsedUrl.hostname.endsWith(`.${allowed}`)
         );
         if (!isAllowed) {
           return { valid: false, error: 'Domain is not in the allowed list' };
@@ -159,18 +159,15 @@ export class InputSanitizer {
 /**
  * Security middleware for actions
  */
-export function validateSecureAction(
-  url: string | null,
-  validator: UrlValidator
-): void {
+export function validateSecureAction(url: string | null, validator: UrlValidator): void {
   if (!url) return;
 
   const validation = validator.validateUrl(url);
   if (!validation.valid) {
-    throw new BrowserSecurityError(
-      `URL validation failed: ${validation.error}`,
-      { url, error: validation.error }
-    );
+    throw new BrowserSecurityError(`URL validation failed: ${validation.error}`, {
+      url,
+      error: validation.error,
+    });
   }
 }
 
@@ -241,4 +238,4 @@ export class RateLimiter {
     userLimit.count++;
     return true;
   }
-} 
+}

@@ -15,7 +15,7 @@ This plugin enables ElizaOS agents to browse websites, interact with web element
 ## Installation
 
 ```bash
-npm install @elizaos/plugin-browserbase
+npm install @elizaos/plugin-stagehand
 ```
 
 ## Configuration
@@ -38,6 +38,11 @@ CAPSOLVER_API_KEY=your_capsolver_key
 TRUTHSOCIAL_USERNAME=your_username
 TRUTHSOCIAL_PASSWORD=your_password
 
+# Optional - for TikTok testing
+TIKTOK_USERNAME=your_username
+TIKTOK_PASSWORD=your_password
+TIKTOK_TEST_VIDEO_PATH=/path/to/test/video.mp4
+
 # Browser settings
 BROWSER_HEADLESS=true  # Run in headless mode (default: true)
 ```
@@ -47,7 +52,7 @@ BROWSER_HEADLESS=true  # Run in headless mode (default: true)
 ### Adding to Your Agent
 
 ```typescript
-import { stagehandPlugin } from '@elizaos/plugin-browserbase';
+import { stagehandPlugin } from '@elizaos/plugin-stagehand';
 
 const agent = {
   name: 'BrowserAgent',
@@ -59,39 +64,49 @@ const agent = {
 ### Available Actions
 
 #### BROWSER_NAVIGATE
+
 Navigate to a specified URL.
 
 **Examples:**
+
 - "Go to google.com"
 - "Navigate to https://github.com/elizaos/eliza"
 - "Open the website example.com"
 
 #### BROWSER_BACK
+
 Go back to the previous page in browser history.
 
 **Examples:**
+
 - "Go back"
 - "Previous page"
 - "Navigate back"
 
 #### BROWSER_FORWARD
+
 Go forward in browser history.
 
 **Examples:**
+
 - "Go forward"
 - "Next page"
 
 #### BROWSER_REFRESH
+
 Refresh the current page.
 
 **Examples:**
+
 - "Refresh the page"
 - "Reload"
 
 #### BROWSER_SOLVE_CAPTCHA
+
 Detect and automatically solve CAPTCHA on the current page (requires CAPSOLVER_API_KEY).
 
 **Examples:**
+
 - "Solve the captcha"
 - "Handle the captcha on this page"
 - "Bypass the captcha"
@@ -99,6 +114,7 @@ Detect and automatically solve CAPTCHA on the current page (requires CAPSOLVER_A
 ### Providers
 
 #### BROWSER_STATE
+
 Provides current browser state information including URL, title, and session details.
 
 The provider automatically includes browser state in the agent's context when making decisions.
@@ -123,6 +139,7 @@ The plugin includes automatic CAPTCHA solving capabilities using CapSolver. Supp
 ### Automatic Detection
 
 When navigating to a page with a CAPTCHA, the plugin will:
+
 1. Automatically detect the CAPTCHA type
 2. Extract the site key
 3. Solve it using CapSolver
@@ -140,15 +157,48 @@ TRUTHSOCIAL_PASSWORD=your_password
 CAPSOLVER_API_KEY=your_api_key
 
 # Run the test
-bun run test:e2e -- --name truthsocial_login_with_captcha_test
+bun run test:e2e -- --name truthsocial_login_flow
 ```
 
 This test will:
+
 1. Navigate to Truth Social login page
 2. Enter credentials
 3. Automatically solve any Cloudflare Turnstile CAPTCHA
 4. Complete the login process
-5. Verify successful login
+5. Extract bearer token for API usage
+6. Verify successful login
+
+### TikTok Upload Test
+
+A comprehensive test for TikTok login and video upload:
+
+```bash
+# Generate a test video (requires ffmpeg)
+npm run generate-test-video
+
+# Add credentials and video path to .env
+TIKTOK_USERNAME=your_username
+TIKTOK_PASSWORD=your_password
+TIKTOK_TEST_VIDEO_PATH=./test-videos/test-video.mp4
+CAPSOLVER_API_KEY=your_api_key
+
+# Run the test
+bun run test:e2e -- --name tiktok_login_and_upload
+```
+
+This test will:
+
+1. Navigate to TikTok login page
+2. Enter credentials using email/username method
+3. Automatically solve any CAPTCHA if present
+4. Extract authentication tokens
+5. Navigate to upload page
+6. Upload the specified video file
+7. Add caption and hashtags
+8. Set privacy to private (for testing)
+9. Submit the video
+10. Verify successful upload
 
 ## Development
 
@@ -167,8 +217,8 @@ bun run build
 
 ### Testing
 
-   ```bash
-   # Run all tests
+```bash
+# Run all tests
 bun run test
 
 # Run component tests with coverage
@@ -181,7 +231,7 @@ bun run test:e2e
 ### Project Structure
 
 ```
-plugin-browserbase/
+plugin-stagehand/
 ├── src/
 │   └── index.ts          # Main plugin implementation
 ├── __tests__/
@@ -203,16 +253,16 @@ The core service that manages browser sessions.
 ```typescript
 class StagehandService extends Service {
   // Create a new browser session
-  async createSession(sessionId: string): Promise<BrowserSession>
-  
+  async createSession(sessionId: string): Promise<BrowserSession>;
+
   // Get an existing session
-  async getSession(sessionId: string): Promise<BrowserSession | undefined>
-  
+  async getSession(sessionId: string): Promise<BrowserSession | undefined>;
+
   // Get the current active session
-  async getCurrentSession(): Promise<BrowserSession | undefined>
-  
+  async getCurrentSession(): Promise<BrowserSession | undefined>;
+
   // Destroy a session
-  async destroySession(sessionId: string): Promise<void>
+  async destroySession(sessionId: string): Promise<void>;
 }
 ```
 
@@ -241,6 +291,7 @@ class BrowserSession {
 ## Contributing
 
 Contributions are welcome! Please ensure:
+
 - All tests pass
 - Code coverage remains high (target: 100%)
 - Follow the existing code style
@@ -256,4 +307,4 @@ Built with [Stagehand](https://github.com/browserbase/stagehand) - the AI-first 
 
 ---
 
-*Note: This plugin is under active development. Features and APIs may change.*
+_Note: This plugin is under active development. Features and APIs may change._

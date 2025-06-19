@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterAll, beforeAll } from 'vitest';
 import { stagehandPlugin, StagehandService, BrowserSession } from '../index';
-import { createMockRuntime, createMockMemory, createMockState, setupLoggerSpies } from './test-utils';
+import {
+  createMockRuntime,
+  createMockMemory,
+  createMockState,
+  setupLoggerSpies,
+} from './test-utils';
 import { type HandlerCallback, type Memory, type State, type IAgentRuntime } from '@elizaos/core';
 import { Stagehand } from '@browserbasehq/stagehand';
 
@@ -198,7 +203,11 @@ describe('Phase 3 Browser Actions', () => {
 
       for (const text of validMessages) {
         const message = createMockMemory({ content: { text } });
-        const isValid = await screenshotAction!.validate(mockRuntime, message as Memory, {} as State);
+        const isValid = await screenshotAction!.validate(
+          mockRuntime,
+          message as Memory,
+          {} as State
+        );
         expect(isValid).toBe(true);
       }
     });
@@ -225,7 +234,7 @@ describe('Phase 3 Browser Actions', () => {
         fullPage: true,
       });
       expect(mockCallback).toHaveBeenCalledWith({
-        text: 'I\'ve taken a screenshot of the current page',
+        text: "I've taken a screenshot of the current page",
         actions: ['BROWSER_SCREENSHOT'],
         source: 'test',
         data: {
@@ -245,7 +254,7 @@ describe('Phase 3 Browser Actions', () => {
   describe('Integration Tests', () => {
     it('should have all Phase 3 actions registered', () => {
       const actionNames = stagehandPlugin.actions?.map((a) => a.name) || [];
-      
+
       expect(actionNames).toContain('BROWSER_EXTRACT');
       expect(actionNames).toContain('BROWSER_SCREENSHOT');
     });
@@ -266,11 +275,19 @@ describe('Phase 3 Browser Actions', () => {
       const message2 = createMockMemory({ content: { text: 'Extract the page title' } });
 
       // Validate both actions can work in sequence
-      const canNavigate = await navigateAction!.validate(mockRuntime as unknown as IAgentRuntime, message1 as Memory, {} as State);
-      const canExtract = await extractAction!.validate(mockRuntime as unknown as IAgentRuntime, message2 as Memory, {} as State);
+      const canNavigate = await navigateAction!.validate(
+        mockRuntime as unknown as IAgentRuntime,
+        message1 as Memory,
+        {} as State
+      );
+      const canExtract = await extractAction!.validate(
+        mockRuntime as unknown as IAgentRuntime,
+        message2 as Memory,
+        {} as State
+      );
 
       expect(canNavigate).toBe(true);
       expect(canExtract).toBe(false); // No session in test
     });
   });
-}); 
+});

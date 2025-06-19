@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { stagehandPlugin, StagehandService, BrowserSession } from '../index';
-import { createMockRuntime, createMockMemory, createMockState, setupLoggerSpies } from './test-utils';
+import {
+  createMockRuntime,
+  createMockMemory,
+  createMockState,
+  setupLoggerSpies,
+} from './test-utils';
 import { Memory, State, logger } from '@elizaos/core';
 import { Stagehand } from '@browserbasehq/stagehand';
 
@@ -48,7 +53,7 @@ describe('BROWSER_STATE provider', () => {
     // Create mock runtime and service
     mockRuntime = createMockRuntime();
     mockService = new StagehandService(mockRuntime);
-    
+
     // Create a mock Stagehand instance
     const mockStagehand = new Stagehand({ env: 'LOCAL' } as any);
     mockSession = new BrowserSession('test-session-1', mockStagehand as any);
@@ -181,4 +186,4 @@ describe('BROWSER_STATE provider', () => {
       expect(result.values.title).toBe('');
     });
   });
-}); 
+});

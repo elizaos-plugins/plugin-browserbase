@@ -14,13 +14,9 @@ import {
 describe('Error Classes', () => {
   describe('StagehandError', () => {
     it('should create error with all properties', () => {
-      const error = new StagehandError(
-        'Test error',
-        'TEST_ERROR',
-        'User friendly message',
-        true,
-        { extra: 'data' }
-      );
+      const error = new StagehandError('Test error', 'TEST_ERROR', 'User friendly message', true, {
+        extra: 'data',
+      });
 
       expect(error.message).toBe('Test error');
       expect(error.code).toBe('TEST_ERROR');
@@ -31,11 +27,7 @@ describe('Error Classes', () => {
     });
 
     it('should default recoverable to true', () => {
-      const error = new StagehandError(
-        'Test error',
-        'TEST_ERROR',
-        'User friendly message'
-      );
+      const error = new StagehandError('Test error', 'TEST_ERROR', 'User friendly message');
 
       expect(error.recoverable).toBe(true);
     });
@@ -47,7 +39,7 @@ describe('Error Classes', () => {
 
       expect(error.code).toBe('BROWSER_NAVIGATION_ERROR');
       expect(error.message).toContain('Failed to navigate to https://example.com');
-      expect(error.userMessage).toContain('couldn\'t navigate to the requested page');
+      expect(error.userMessage).toContain("couldn't navigate to the requested page");
       expect(error.recoverable).toBe(true);
       expect(error.details?.url).toBe('https://example.com');
     });
@@ -78,7 +70,7 @@ describe('Error Classes', () => {
 
       expect(error.code).toBe('BROWSER_ACTION_ERROR');
       expect(error.message).toContain('Failed to click on "submit button"');
-      expect(error.userMessage).toContain('couldn\'t click the element');
+      expect(error.userMessage).toContain("couldn't click the element");
       expect(error.details?.action).toBe('click');
       expect(error.details?.target).toBe('submit button');
     });
@@ -110,7 +102,7 @@ describe('Error Classes', () => {
 
       expect(error.code).toBe('BROWSER_EXTRACTION_ERROR');
       expect(error.message).toContain('Failed to extract data');
-      expect(error.userMessage).toContain('couldn\'t extract the requested information');
+      expect(error.userMessage).toContain("couldn't extract the requested information");
       expect(error.details?.instruction).toBe('Extract user name');
     });
 
@@ -243,4 +235,4 @@ describe('handleBrowserError', () => {
       })
     );
   });
-}); 
+});
